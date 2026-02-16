@@ -13,7 +13,11 @@ cd build
 
 # Configure with CMake
 echo "[1/2] Configuring project with CMake..."
-cmake .. > /dev/null 2>&1
+if ! cmake .. ; then
+    echo ""
+    echo "CMake configuration failed!"
+    exit 1
+fi
 
 # Build the project
 echo "[2/2] Building all targets..."
