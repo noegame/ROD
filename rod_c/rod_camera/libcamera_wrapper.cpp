@@ -83,7 +83,23 @@ int libcamera_start(LibCameraContext* ctx) {
     if (ctx->allocator->allocate(stream) < 0)
         return -1;
 
-    return ctx->camera->start();
+    // Configure camera controls (matching Python picamera2 settings)
+    ControlList controls;
+    
+    // Enable auto-exposure (critical for proper exposure)
+    controls.set(controls::AeEnable, true);
+    
+    // Set noise reduction to high quality (from camera.txt: NoiseReductionMode.HighQuality = 2)
+    controls.set(controls::draft::NoiseReductionModeEnum, controls::draft::NoiseReductionModeHighQuality);
+    
+    // Set frame duration limits (from camera.txt: (100, 1000000000) = 100ns to 1s)
+    controls.set(controls::FrameDurationLimits, Span<const int64_t, 2>({static_cast<int64_t>(100), static_cast<int64_t>(1000000000)}));
+    
+    // Apply controls and start camera
+    if (ctx->camera->start(&controls) < 0)
+        return -1;
+
+    return 0;
 }
 
 int libcamera_stop(LibCameraContext* ctx) {

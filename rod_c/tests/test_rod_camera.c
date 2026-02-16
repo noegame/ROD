@@ -51,9 +51,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    // Warm-up: capture a few frames to let camera adjust (exposure, white balance)
-    printf("Warming up camera (capturing 3 frames to stabilize exposure)...\n");
-    for (int i = 0; i < 3; i++) {
+    // Warm-up: capture several frames to let camera adjust (exposure, white balance)
+    // Auto-exposure needs 5-10 frames to stabilize in low light conditions
+    printf("Warming up camera (capturing 10 frames to stabilize auto-exposure)...\n");
+    for (int i = 0; i < 10; i++) {
         uint8_t* warmup_buffer = NULL;
         int w, h;
         size_t s;
@@ -61,7 +62,7 @@ int main(int argc, char* argv[]) {
             free(warmup_buffer);
             printf("  Warmup frame %d captured\n", i + 1);
         }
-        usleep(100000);  // 100ms between warmup frames
+        usleep(200000);  // 200ms between warmup frames (allow AE to adjust)
     }
     
     printf("Capturing final image...\n");
