@@ -12,8 +12,22 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 # Find required packages
-find_package(OpenCV REQUIRED)
 find_package(PkgConfig REQUIRED)
+
+# Find OpenCV - try multiple methods for compatibility
+find_package(OpenCV QUIET)
+
+if(NOT OpenCV_FOUND)
+    # Try pkg-config as fallback (common on Raspberry Pi)
+    pkg_check_modules(OpenCV REQUIRED opencv4)
+    if(NOT OpenCV_FOUND)
+        pkg_check_modules(OpenCV REQUIRED opencv)
+    endif()
+    
+    # Set variables to match find_package naming
+    set(OpenCV_LIBS ${OpenCV_LIBRARIES})
+    set(OpenCV_INCLUDE_DIRS ${OpenCV_INCLUDE_DIRS})
+endif()
 
 # Try to find libcamera (optional)
 pkg_check_modules(LIBCAMERA libcamera)
