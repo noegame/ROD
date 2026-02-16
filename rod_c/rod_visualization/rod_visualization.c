@@ -15,6 +15,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <sys/time.h>
 
 /* ***************************************************** Public macros *************************************************** */
 
@@ -103,6 +105,24 @@ void rod_viz_annotate_with_counter(ImageHandle* image, MarkerCounts counts) {
     snprintf(text, sizeof(text), "total : %d", counts.total);
     put_text(image, text, start_x, start_y + line_height * 5, font_scale, black, 3);
     put_text(image, text, start_x, start_y + line_height * 5, font_scale, green, 2);
+}
+
+void rod_viz_generate_timestamp(char* buffer, size_t buffer_size) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    
+    struct tm* tm_info = localtime(&tv.tv_sec);
+    int milliseconds = tv.tv_usec / 1000;
+    
+    // Generate timestamp: YYYYMMDD_HHMMSS_mmm
+    snprintf(buffer, buffer_size, "%04d%02d%02d_%02d%02d%02d_%03d",
+             tm_info->tm_year + 1900,
+             tm_info->tm_mon + 1,
+             tm_info->tm_mday,
+             tm_info->tm_hour,
+             tm_info->tm_min,
+             tm_info->tm_sec,
+             milliseconds);
 }
 
 int rod_viz_save_debug_image(ImageHandle* image, MarkerData* markers, int count, 

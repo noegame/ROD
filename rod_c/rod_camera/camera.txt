@@ -1,0 +1,56 @@
+Les différents modes de la caméra
+
+roboteseo@tdc:~ $ rpicam-hello --list-cameras
+Available cameras
+-----------------
+0 : imx477 [4056x3040 12-bit RGGB] (/base/axi/pcie@1000120000/rp1/i2c@88000/imx477@1a)
+    Modes: 'SRGGB10_CSI2P' : 1332x990 [120.50 fps - (696, 528)/2664x1980 crop]
+                             2028x1080 [74.74 fps - (0, 440)/4056x2160 crop]
+                             2028x1520 [53.77 fps - (0, 0)/4056x3040 crop]
+                             4056x2160 [19.58 fps - (0, 440)/4056x3040 crop]
+                             4056x3040 [14.00 fps - (0, 0)/4056x3040 crop]
+           'SRGGB12_CSI2P' : 1332x990 [101.68 fps - (696, 528)/2664x1980 crop]
+                             2028x1080 [62.81 fps - (0, 440)/4056x2160 crop]
+                             2028x1520 [45.19 fps - (0, 0)/4056x3040 crop]
+                             4056x2160 [16.39 fps - (0, 440)/4056x3040 crop]
+                             4056x3040 [11.72 fps - (0, 0)/4056x3040 crop]
+           'SRGGB8' : 1332x990 [147.91 fps - (696, 528)/2664x1980 crop]
+                      2028x1080 [92.27 fps - (0, 440)/4056x2160 crop]
+                      2028x1520 [66.38 fps - (0, 0)/4056x3040 crop]
+                      4056x2160 [24.32 fps - (0, 440)/4056x3040 crop]
+                      4056x3040 [17.39 fps - (0, 0)/4056x3040 crop]
+
+roboteseo@tdc:~ $
+
+résultat de Méthode simple : afficher les contrôles actifs depuis Picamera2
+Ce que ça donne :
+config → configuration libcamera
+metadata → valeurs réellement appliquées par le pipeline
+
+
+
+roboteseo@tdc:~ $ python camera.py
+[0:32:44.929823620] [1258]  INFO Camera camera_manager.cpp:340 libcamera v0.6.0+rpt20251202
+[0:32:44.937606750] [1261]  INFO RPI pisp.cpp:720 libpisp version 1.3.0
+[0:32:44.939751994] [1261]  INFO IPAProxy ipa_proxy.cpp:180 Using tuning file /usr/share/libcamera/ipa/rpi/pisp/imx477.json
+[0:32:44.945951117] [1261]  INFO Camera camera_manager.cpp:223 Adding camera '/base/axi/pcie@1000120000/rp1/i2c@88000/imx477@1a' for pipeline handler rpi/pisp
+[0:32:44.945984339] [1261]  INFO RPI pisp.cpp:1181 Registered camera /base/axi/pcie@1000120000/rp1/i2c@88000/imx477@1a to CFE device /dev/media0 and ISP device /dev/media2 using PiSP variant BCM2712_D0
+[0:32:44.948743282] [1258]  INFO Camera camera.cpp:1215 configuring streams: (0) 4056x3040-BGR888/sRGB (1) 4056x3040-BGGR_PISP_COMP1/RAW
+[0:32:44.948840578] [1261]  INFO RPI pisp.cpp:1485 Sensor: /base/axi/pcie@1000120000/rp1/i2c@88000/imx477@1a - Selected sensor format: 4056x3040-SBGGR12_1X12/RAW - Selected CFE format: 4056x3040-PC1B/RAW
+
+Camera configuration:
+
+{'use_case': 'still', 'transform': <libcamera.Transform 'identity'>, 'colour_space': <libcamera.ColorSpace 'sYCC'>, 'buffer_count': 1, 'queue': True, 'main': {'format': 'BGR888', 'size': (4056, 3040), 'preserve_ar': True, 'stride': 12224, 'framesize': 37160960}, 'lores': None, 'raw': {'format': 'BGGR_PISP_COMP1', 'size': (4056, 3040), 'stride': 4096, 'framesize': 12451840}, 'controls': {'NoiseReductionMode': <NoiseReductionModeEnum.HighQuality: 2>, 'FrameDurationLimits': (100, 1000000000)}, 'sensor': {}, 'display': None, 'encode': None}
+
+print(picam2.camera_configuration())
+
+{'SensorTimestamp': 1966693355000, 'FrameWallClock': 1771260338201160960, 'ExposureTime': 33962, 'FocusFoM': 2242, 'ColourGains': (2.8654863834381104, 1.733712077140808), 'DigitalGain': 1.0000182390213013, 'FrameDuration': 85335, 'Lux': 77.79224395751953, 'SensorTemperature': 20.0, 'AeState': 1, 'ColourTemperature': 3985, 'SensorBlackLevels': (4096, 4096, 4096, 4096), 'AnalogueGain': 2.0, 'ColourCorrectionMatrix': (2.0840511322021484, -0.8765736222267151, -0.20747338235378265, -0.386363685131073, 2.045722246170044, -0.659358561038971, -0.09513084590435028, -0.5829789042472839, 1.6781097650527954), 'ScalerCrop': (0, 0, 4056, 3040)}
+
+picam2.camera_controls
+
+{'ExposureValue': (-8.0, 8.0, 0.0), 'AeEnable': (False, True, True), 'Sharpness': (0.0, 16.0, 1.0), 'AeFlickerMode': (0, 1, 0), 'ScalerCrop': ((0, 0, 255, 191), (0, 0, 4056, 3040), (0, 0, 4056, 3040)), 'FrameDurationLimits': (85335, 694434742, (33333, 33333)), 'SyncMode': (0, 2, 0), 'SyncFrames': (1, 1000000, 100), 'Saturation': (0.0, 32.0, 1.0), 'ColourTemperature': (100, 100000, None), 'AwbMode': (0, 7, 0), 'ColourGains': (0.0, 32.0, None), 'AwbEnable': (False, True, None), 'CnnEnableInputTensor': (False, True, False), 'ExposureTime': (110, 694422939, 20000), 'AeExposureMode': (0, 3, 0), 'Contrast': (0.0, 32.0, 1.0), 'AeConstraintMode': (0, 3, 0), 'ExposureTimeMode': (0, 1, 0), 'HdrMode': (0, 4, 0), 'AeMeteringMode': (0, 3, 0), 'ColourCorrectionMatrix': (0.0, 8.0, None), 'AnalogueGain': (1.0, 22.2608699798584, 1.0), 'AeFlickerPeriod': (100, 1000000, None), 'NoiseReductionMode': (0, 4, 0), 'AnalogueGainMode': (0, 1, 0), 'Brightness': (-1.0, 1.0, 0.0), 'StatsOutputEnable': (False, True, False)}
+
+picam2.camera_configuration()
+
+{'use_case': 'still', 'transform': <libcamera.Transform 'identity'>, 'colour_space': <libcamera.ColorSpace 'sYCC'>, 'buffer_count': 1, 'queue': True, 'main': {'format': 'BGR888', 'size': (4056, 3040), 'preserve_ar': True, 'stride': 12224, 'framesize': 37160960}, 'lores': None, 'raw': {'format': 'BGGR_PISP_COMP1', 'size': (4056, 3040), 'stride': 4096, 'framesize': 12451840}, 'controls': {'NoiseReductionMode': <NoiseReductionModeEnum.HighQuality: 2>, 'FrameDurationLimits': (100, 1000000000)}, 'sensor': {'bit_depth': 12, 'output_size': (4056, 3040)}, 'display': None, 'encode': None}
+roboteseo@tdc:~ $

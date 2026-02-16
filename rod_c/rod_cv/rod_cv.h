@@ -139,5 +139,30 @@ MarkerCounts count_markers_by_category(MarkerData* markers, int count);
  */
 // void estimate_marker_pose(ImageHandle* image, MarkerHandle* marker_handle);
 
+/**
+ * @brief Create a mask for the playing field based on fixed markers
+ * @param image_path Path to the image (for initial detection)
+ * @param detector ArUco detector handle
+ * @param output_width Output mask width (should match target image)
+ * @param output_height Output mask height (should match target image)
+ * @param scale_y Vertical scale factor for mask (1.0 = normal, >1.0 = extend vertically)
+ * @param homography_inv Output parameter for inverse homography matrix (3x3), can be NULL
+ * @return Mask image handle (grayscale, 255=valid area, 0=masked), or NULL on failure
+ * 
+ * This function:
+ * 1. Detects fixed markers (IDs 20, 21, 22, 23) in the image
+ * 2. Calculates homography from real-world coordinates to image coordinates
+ * 3. Projects the playing field boundaries (2000x3000mm) into the image
+ * 4. Creates a binary mask covering the playing field area
+ * 
+ * Matches the Python implementation in find_mask().
+ */
+ImageHandle* create_field_mask(const char* image_path, 
+                                ArucoDetectorHandle* detector,
+                                int output_width, 
+                                int output_height,
+                                float scale_y,
+                                float* homography_inv);
+
 
 /* ******************************************* Public callback functions declarations ************************************ */

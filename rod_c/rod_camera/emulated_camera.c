@@ -231,23 +231,13 @@ int emulated_camera_take_picture(EmulatedCameraContext* ctx,
         img_height = ctx->height;
     }
     
-    // Calculate buffer size (RGB format: 3 bytes per pixel)
+    // Calculate buffer size (BGR format: 3 bytes per pixel)
     size_t buffer_size = img_width * img_height * 3;
     
-    // Convert BGR to RGB (OpenCV loads images in BGR format)
-    ImageHandle* rgb_image = convert_bgr_to_rgb(final_image);
-    if (!rgb_image) {
-        fprintf(stderr, "Error: Failed to convert image to RGB\n");
-        if (should_release_original) release_image(image);
-        release_image(final_image);
-        return -1;
-    }
-    
-    // Get raw image data
-    uint8_t* image_data = get_image_data(rgb_image);
+    // Get raw image data (already in BGR format from OpenCV load)
+    uint8_t* image_data = get_image_data(final_image);
     if (!image_data) {
         fprintf(stderr, "Error: Failed to get image data\n");
-        release_image(rgb_image);
         if (should_release_original) release_image(image);
         release_image(final_image);
         return -1;
@@ -257,7 +247,6 @@ int emulated_camera_take_picture(EmulatedCameraContext* ctx,
     uint8_t* buffer = (uint8_t*)malloc(buffer_size);
     if (!buffer) {
         fprintf(stderr, "Error: Failed to allocate image buffer\n");
-        release_image(rgb_image);
         if (should_release_original) release_image(image);
         release_image(final_image);
         return -1;
@@ -267,9 +256,6 @@ int emulated_camera_take_picture(EmulatedCameraContext* ctx,
     memcpy(buffer, image_data, buffer_size);
     
     // Clean up images
-    release_image(rgb_image);
-    
-    // Only release original and final separately if they are different
     if (should_release_original) {
         release_image(image);
         release_image(final_image);

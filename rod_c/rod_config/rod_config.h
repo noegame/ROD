@@ -87,6 +87,23 @@ void rod_config_configure_detector_parameters(DetectorParametersHandle* params);
  */
 int rod_config_get_aruco_dictionary_type(void);
 
+/**
+ * @brief Get the camera calibration matrix (3x3) for fisheye lens
+ * @return Pointer to 3x3 camera matrix (row-major order)
+ * 
+ * Camera matrix K from fisheye calibration:
+ * [fx  0  cx]
+ * [0  fy  cy]
+ * [0   0   1]
+ */
+const float* rod_config_get_camera_matrix(void);
+
+/**
+ * @brief Get the distortion coefficients for fisheye lens
+ * @return Pointer to 4 distortion coefficients [k1, k2, k3, k4]
+ */
+const float* rod_config_get_distortion_coeffs(void);
+
 #ifdef __cplusplus
 }
 #endif

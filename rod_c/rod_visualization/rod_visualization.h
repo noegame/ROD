@@ -55,6 +55,16 @@ void rod_viz_annotate_with_centers(ImageHandle* image, MarkerData* markers, int 
 void rod_viz_annotate_with_counter(ImageHandle* image, MarkerCounts counts);
 
 /**
+ * @brief Generate timestamp-based filename
+ * @param buffer Output buffer for the timestamp string
+ * @param buffer_size Size of the output buffer
+ * 
+ * Generates timestamp string in format: YYYYMMDD_HHMMSS_mmm
+ * Example: 20260216_173855_456
+ */
+void rod_viz_generate_timestamp(char* buffer, size_t buffer_size);
+
+/**
  * @brief Save annotated debug image
  * @param image Original image
  * @param markers Array of marker data

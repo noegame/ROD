@@ -17,6 +17,7 @@ int libcamera_configure(LibCameraContext* ctx, int width, int height);
 int libcamera_start(LibCameraContext* ctx);
 int libcamera_stop(LibCameraContext* ctx);
 int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
+                            int* out_width, int* out_height,
                             size_t* out_size, int timeout_ms);
 void libcamera_cleanup(LibCameraContext* ctx);
 

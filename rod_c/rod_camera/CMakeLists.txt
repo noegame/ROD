@@ -62,6 +62,16 @@ if(CAMERA_SOURCES)
         )
     endif()
     
+    # Link with libcamera_wrapper if camera.c is included and libcamera is available
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/camera.c AND LIBCAMERA_FOUND)
+        target_link_libraries(rod_camera
+            libcamera_wrapper
+        )
+        target_include_directories(rod_camera PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+    endif()
+    
     target_include_directories(rod_camera PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
     )

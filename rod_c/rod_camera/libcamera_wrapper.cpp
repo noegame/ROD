@@ -4,6 +4,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <cstring>
 #include <sys/mman.h>
 #include <vector>
 
@@ -54,14 +55,14 @@ int libcamera_configure(LibCameraContext* ctx, int width, int height) {
     if (!ctx || !ctx->camera)
         return -1;
 
-    ctx->config = ctx->camera->generateConfiguration({StreamRole::VideoRecording});
+    ctx->config = ctx->camera->generateConfiguration({StreamRole::StillCapture});
     if (!ctx->config)
         return -1;
 
     StreamConfiguration &streamConfig = ctx->config->at(0);
     streamConfig.size.width = width;
     streamConfig.size.height = height;
-    streamConfig.pixelFormat = PixelFormat::fromString("YUV420");
+    streamConfig.pixelFormat = PixelFormat::fromString("BGR888");
 
     if (ctx->config->validate() == CameraConfiguration::Invalid)
         return -1;
@@ -93,11 +94,13 @@ int libcamera_stop(LibCameraContext* ctx) {
 }
 
 /**
- * Capture a single frame and return its buffer and size.
- * The caller is responsible for unmapping the buffer.
+ * Capture a single frame and return its buffer, dimensions and size.
+ * Returns BGR888 format buffer (OpenCV native format).
+ * The caller must free() the returned buffer.
  * Returns 0 on success, -1 on failure.
  */
 int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
+                            int* out_width, int* out_height,
                             size_t* out_size, int timeout_ms) {
     if (!ctx || !ctx->camera || !ctx->allocator)
         return -1;
@@ -117,20 +120,39 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
     if (ret < 0)
         return -1;
 
-    // Wait for request completion (simplified for example purposes)
+    // Wait for completion - simplified synchronous approach
+    // For MVP: poll with sleep (proper event loop could be added later)
     std::this_thread::sleep_for(std::chrono::milliseconds(timeout_ms));
 
     FrameBuffer *buffer = request->findBuffer(stream);
     if (!buffer)
         return -1;
 
-    // Map buffer and return data
+    // Get stream configuration for dimensions
+    const StreamConfiguration &cfg = ctx->config->at(0);
+    *out_width = cfg.size.width;
+    *out_height = cfg.size.height;
+
+    // Map buffer and copy data to caller-owned buffer
     const FrameBuffer::Plane &plane = buffer->planes().front();
-    void *mem = mmap(nullptr, plane.length, PROT_READ | PROT_WRITE, MAP_SHARED, plane.fd.get(), 0);
+    void *mem = mmap(nullptr, plane.length, PROT_READ, MAP_SHARED, plane.fd.get(), 0);
     if (mem == MAP_FAILED)
         return -1;
-    *out_buffer = static_cast<uint8_t*>(mem);
-    *out_size = plane.length;
+
+    // Allocate buffer for caller (BGR888: 3 bytes per pixel)
+    size_t data_size = (*out_width) * (*out_height) * 3;
+    *out_buffer = (uint8_t*)malloc(data_size);
+    if (!(*out_buffer)) {
+        munmap(mem, plane.length);
+        return -1;
+    }
+
+    // Copy data from mmap'd buffer
+    memcpy(*out_buffer, mem, data_size);
+    *out_size = data_size;
+
+    // Unmap the buffer
+    munmap(mem, plane.length);
 
     return 0;
 }

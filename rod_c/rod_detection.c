@@ -44,6 +44,9 @@
 // Debug image saving (save one annotated image every N frames)
 #define SAVE_DEBUG_IMAGE_INTERVAL ROD_SAVE_DEBUG_IMAGE_INTERVAL
 
+// Detection pipeline parameters (must match Python implementation)
+#define DETECTION_SCALE_FACTOR 1.5f  // Resize scale for better detection
+
 /* ************************************************** Public types definition ******************************************** */
 
 /**
@@ -55,6 +58,7 @@ typedef struct {
     ArucoDictionaryHandle* dictionary;
     DetectorParametersHandle* params;
     RodSocketServer* socket_server;
+    ImageHandle* field_mask;  // Field mask for filtering detections
     bool running;
 } AppContext;
 
@@ -144,11 +148,37 @@ static int init_app_context(AppContext* ctx, const char* image_folder) {
     }
     printf("ArUco detector initialized (DICT_4X4_50)\n");
     
+    // Create field mask from first image in folder
+    // This mask will be used to filter detections outside the playing field
+    printf("Creating field mask...\n");
+    
+    // Get first image path from the folder
+    char first_image[512];
+    snprintf(first_image, sizeof(first_image), "%s/IMG_1415.JPG", image_folder);
+    
+    // Create mask with 1.1x vertical scale (to include slightly outside field)
+    // Mask dimensions will match camera output (need to get from camera)
+    // For now, use standard resolution - will be resized if needed
+    ctx->field_mask = create_field_mask(first_image, ctx->detector, 4032, 3024, 1.1f, NULL);
+    
+    if (!ctx->field_mask) {
+        fprintf(stderr, "Warning: Failed to create field mask, continuing without masking\n");
+        ctx->field_mask = NULL;
+    } else {
+        printf("Field mask created successfully\n");
+    }
+    
     return 0;
 }
 
 static void cleanup_app_context(AppContext* ctx) {
     if (!ctx) return;
+    
+    // Release field mask
+    if (ctx->field_mask) {
+        release_image(ctx->field_mask);
+        ctx->field_mask = NULL;
+    }
     
     // Cleanup ArUco detector
     if (ctx->detector) {
@@ -238,19 +268,65 @@ int main(int argc, char* argv[]) {
             continue;
         }
         
-        // Create OpenCV image handle from RGB buffer
-        // emulated_camera returns RGB format (format=1)
-        ImageHandle* image = create_image_from_buffer(image_buffer, width, height, 3, 1);
+        // Create OpenCV image handle from BGR buffer
+        // Camera returns BGR format (format=0, OpenCV native - no conversion)
+        ImageHandle* original_image = create_image_from_buffer(image_buffer, width, height, 3, 0);
         free(image_buffer);  // Buffer is copied by create_image_from_buffer
         
-        if (!image) {
+        if (!original_image) {
             fprintf(stderr, "Failed to create image from buffer\n");
             usleep(10000);  // Wait 10ms before retry
             continue;
         }
         
-        // Detect ArUco markers
-        DetectionResult* detection = detectMarkersWithConfidence(ctx.detector, image);
+        // ===== PREPROCESSING PIPELINE (matching Python implementation) =====
+        // Step 1: Apply sharpening filter to enhance marker edges
+        ImageHandle* sharpened_image = sharpen_image(original_image);
+        if (!sharpened_image) {
+            fprintf(stderr, "Failed to sharpen image\n");
+            release_image(original_image);
+            usleep(10000);
+            continue;
+        }
+        
+        // Step 2: Apply field mask to filter out areas outside the playing field
+        ImageHandle* masked_image = sharpened_image;
+        if (ctx.field_mask) {
+            masked_image = bitwise_and_mask(sharpened_image, ctx.field_mask);
+            if (!masked_image) {
+                fprintf(stderr, "Failed to apply mask, using unmasked image\n");
+                masked_image = sharpened_image;
+            } else {
+                // Release sharpened_image since we now have masked_image
+                release_image(sharpened_image);
+            }
+        }
+        
+        // Step 3: Resize image (1.5x scale) for better detection of small/distant markers
+        int new_width = (int)(width * DETECTION_SCALE_FACTOR);
+        int new_height = (int)(height * DETECTION_SCALE_FACTOR);
+        ImageHandle* resized_image = resize_image(masked_image, new_width, new_height);
+        
+        if (!resized_image) {
+            fprintf(stderr, "Failed to resize image\n");
+            release_image(original_image);
+            usleep(10000);
+            continue;
+        }
+        
+        // Step 3: Detect ArUco markers on preprocessed image
+        DetectionResult* detection = detectMarkersWithConfidence(ctx.detector, resized_image);
+        release_image(resized_image);  // Don't need resized image anymore
+        
+        // Step 4: Scale coordinates back to original image size
+        if (detection && detection->count > 0) {
+            for (int i = 0; i < detection->count; i++) {
+                for (int j = 0; j < 4; j++) {
+                    detection->markers[i].corners[j][0] /= DETECTION_SCALE_FACTOR;
+                    detection->markers[i].corners[j][1] /= DETECTION_SCALE_FACTOR;
+                }
+            }
+        }
         
         if (detection && detection->count > 0) {
             // Filter and process detected markers using rod_cv module
@@ -262,9 +338,51 @@ int main(int argc, char* argv[]) {
                 rod_socket_server_send_detections(ctx.socket_server, markers, valid_count);
             }
             
-            // Save debug image periodically using rod_visualization module
+            // Save debug images periodically (original, annotated, masked)
             if (frame_count % SAVE_DEBUG_IMAGE_INTERVAL == 0) {
-                rod_viz_save_debug_image(image, markers, valid_count, frame_count, DEBUG_OUTPUT_FOLDER);
+                // Generate timestamp for filenames
+                char timestamp[32];
+                rod_viz_generate_timestamp(timestamp, sizeof(timestamp));
+                
+                // 1. Save original image
+                char filename_original[512];
+                snprintf(filename_original, sizeof(filename_original), "%s/%s_original.png", DEBUG_OUTPUT_FOLDER, timestamp);
+                save_image(filename_original, original_image);
+                
+                // 2. Save annotated image (create copy, annotate, save)
+                int img_width = get_image_width(original_image);
+                int img_height = get_image_height(original_image);
+                int img_channels = get_image_channels(original_image);
+                uint8_t* img_data = get_image_data(original_image);
+                size_t img_data_size = get_image_data_size(original_image);
+                
+                if (img_data && img_data_size > 0) {
+                    uint8_t* data_copy = (uint8_t*)malloc(img_data_size);
+                    if (data_copy) {
+                        memcpy(data_copy, img_data, img_data_size);
+                        ImageHandle* annotated = create_image_from_buffer(data_copy, img_width, img_height, img_channels, 0);
+                        free(data_copy);
+                        
+                        if (annotated) {
+                            MarkerCounts marker_counts = count_markers_by_category(markers, valid_count);
+                            rod_viz_annotate_with_counter(annotated, marker_counts);
+                            rod_viz_annotate_with_ids(annotated, markers, valid_count);
+                            rod_viz_annotate_with_centers(annotated, markers, valid_count);
+                            
+                            char filename_annotated[512];
+                            snprintf(filename_annotated, sizeof(filename_annotated), "%s/%s_annotated.png", DEBUG_OUTPUT_FOLDER, timestamp);
+                            save_image(filename_annotated, annotated);
+                            release_image(annotated);
+                        }
+                    }
+                }
+                
+                // 3. Save masked/preprocessed image
+                char filename_masked[512];
+                snprintf(filename_masked, sizeof(filename_masked), "%s/%s_masked.png", DEBUG_OUTPUT_FOLDER, timestamp);
+                save_image(filename_masked, masked_image);
+                
+                printf("Debug images saved: %s_*.png (markers: %d)\n", timestamp, valid_count);
             }
             
             releaseDetectionResult(detection);
@@ -274,15 +392,26 @@ int main(int argc, char* argv[]) {
                 printf("Frame %d: No markers detected\n", frame_count);
             }
             
-            // Save debug image periodically even when no markers detected
+            // Save debug images periodically even when no markers detected
             if (frame_count % SAVE_DEBUG_IMAGE_INTERVAL == 0) {
-                MarkerData empty_markers[1];
-                rod_viz_save_debug_image(image, empty_markers, 0, frame_count, DEBUG_OUTPUT_FOLDER);
+                char timestamp[32];
+                rod_viz_generate_timestamp(timestamp, sizeof(timestamp));
+                
+                char filename_original[512];
+                snprintf(filename_original, sizeof(filename_original), "%s/%s_original.png", DEBUG_OUTPUT_FOLDER, timestamp);
+                save_image(filename_original, original_image);
+                
+                char filename_masked[512];
+                snprintf(filename_masked, sizeof(filename_masked), "%s/%s_masked.png", DEBUG_OUTPUT_FOLDER, timestamp);
+                save_image(filename_masked, masked_image);
+                
+                printf("Debug images saved: %s_*.png (no markers)\n", timestamp);
             }
         }
         
-        // Release image
-        release_image(image);
+        // Release images
+        release_image(masked_image);
+        release_image(original_image);
     }
     
     printf("\nShutting down...\n");

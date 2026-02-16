@@ -71,3 +71,23 @@ void rod_config_configure_detector_parameters(DetectorParametersHandle* params) 
 int rod_config_get_aruco_dictionary_type(void) {
     return DICT_4X4_50;
 }
+
+const float* rod_config_get_camera_matrix(void) {
+    // Camera calibration matrix from fisheye calibration
+    // Matches values from Python implementation (rod_python/lab/8 detect aruco tags...)
+    static const float camera_matrix[9] = {
+        2493.62477, 0.0, 1977.18701,
+        0.0, 2493.11358, 2034.91176,
+        0.0, 0.0, 1.0
+    };
+    return camera_matrix;
+}
+
+const float* rod_config_get_distortion_coeffs(void) {
+    // Fisheye distortion coefficients (k1, k2, k3, k4)
+    // Matches values from Python implementation
+    static const float dist_coeffs[4] = {
+        -0.1203345, 0.06802544, -0.13779641, 0.08243704
+    };
+    return dist_coeffs;
+}
