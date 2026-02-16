@@ -10,11 +10,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <libgen.h>
+#include <unistd.h>
 
 int main(int argc, char* argv[]) {
     int width = 640;
     int height = 480;
-    const char* output_path = "pictures/debug/test_libcamera.jpg";
+    const char* output_path = "/var/pictures/debug/test_libcamera.jpg";
     
     // Parse optional arguments
     if (argc >= 3) {
@@ -48,7 +51,20 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    printf("Capturing image...\n");
+    // Warm-up: capture a few frames to let camera adjust (exposure, white balance)
+    printf("Warming up camera (capturing 3 frames to stabilize exposure)...\n");
+    for (int i = 0; i < 3; i++) {
+        uint8_t* warmup_buffer = NULL;
+        int w, h;
+        size_t s;
+        if (camera_take_picture(camera, &warmup_buffer, &w, &h, &s) == 0) {
+            free(warmup_buffer);
+            printf("  Warmup frame %d captured\n", i + 1);
+        }
+        usleep(100000);  // 100ms between warmup frames
+    }
+    
+    printf("Capturing final image...\n");
     uint8_t* buffer = NULL;
     int img_width, img_height;
     size_t img_size;
@@ -98,10 +114,39 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
+    // Create directory if needed - recursive creation
+    char* path_copy = strdup(output_path);
+    char* dir = dirname(path_copy);
+    
+    // Create parent directories recursively
+    char tmp[256];
+    snprintf(tmp, sizeof(tmp), "%s", dir);
+    for (char* p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            mkdir(tmp, 0755);
+            *p = '/';
+        }
+    }
+    mkdir(tmp, 0755);  // Create final directory
+    free(path_copy);
+    
     // Save image to file
-    printf("Saving image to %s...\n", output_path);
+    char abs_path[256];
+    if (output_path[0] != '/') {
+        // Convert to absolute path for display
+        getcwd(abs_path, sizeof(abs_path));
+        snprintf(abs_path, sizeof(abs_path), "%s/%s", abs_path, output_path);
+    } else {
+        strncpy(abs_path, output_path, sizeof(abs_path));
+    }
+    printf("Saving image to %s...\n", abs_path);
     if (!save_image(output_path, image)) {
-        fprintf(stderr, "Failed to save image\n");
+        fprintf(stderr, "Failed to save image to %s\n", output_path);
+        fprintf(stderr, "Possible causes:\n");
+        fprintf(stderr, "  - Directory doesn't exist or no write permissions\n");
+        fprintf(stderr, "  - Try: sudo mkdir -p /var/pictures/debug\n");
+        fprintf(stderr, "  - Try: sudo chmod 777 /var/pictures/debug\n");
         release_image(image);
         camera_stop(camera);
         camera_cleanup(camera);
