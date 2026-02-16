@@ -19,30 +19,6 @@ The communication thread is responsible for printing the detected objects coordi
 
 The computer vision thread send to the communication thread via socket an array that contain the list of detected objects with their coordinates [[id, x,y,angle], [id, x,y,angle], ...].
 
-### Running with systemd (Production)
-
-For production use on Raspberry Pi, ROD can be run as systemd services:
-
-```bash
-# Install services
-cd systemd
-sudo ./install.sh
-
-# Start ROD
-sudo systemctl start rod.target
-
-# Check status
-systemctl status rod.target
-
-# View logs
-sudo journalctl -u rod-detection.service -f
-
-# Enable at boot (optional)
-sudo systemctl enable rod.target
-```
-
-See [systemd/README.md](systemd/README.md) for complete documentation.
-
 ```plantuml
 rectangle "File structure"{
     folder "rod" {
@@ -60,6 +36,15 @@ rectangle "File structure"{
         }
         folder "rod_communication" {
             file "rod_communication.c"
+        }
+        folder "rod_config" {
+            file "rod_config.c"
+        }
+        folder "rod_socket" {
+            file "rod_socket.c"
+        }
+        folder "rod_utils" {
+            file "rod_utils.c"
         }
     }
 }
