@@ -123,13 +123,26 @@ struct ArucoDetectorState {
 };
 
 ArucoDictionaryHandle* getPredefinedDictionary(int dict_id) {
-    cv::Ptr<cv::aruco::Dictionary> dict = cv::aruco::getPredefinedDictionary(dict_id);
-    cv::Ptr<cv::aruco::Dictionary>* dict_ptr = new cv::Ptr<cv::aruco::Dictionary>(dict);
-    return reinterpret_cast<ArucoDictionaryHandle*>(dict_ptr);
+    // OpenCV 4.7+ changed the return type to cv::aruco::Dictionary (not cv::Ptr)
+    #if CV_VERSION_MAJOR > 4 || (CV_VERSION_MAJOR == 4 && CV_VERSION_MINOR >= 7)
+        cv::aruco::Dictionary dict = cv::aruco::getPredefinedDictionary(dict_id);
+        cv::Ptr<cv::aruco::Dictionary> dict_ptr = cv::makePtr<cv::aruco::Dictionary>(dict);
+    #else
+        cv::Ptr<cv::aruco::Dictionary> dict_ptr = cv::aruco::getPredefinedDictionary(dict_id);
+    #endif
+    
+    cv::Ptr<cv::aruco::Dictionary>* result = new cv::Ptr<cv::aruco::Dictionary>(dict_ptr);
+    return reinterpret_cast<ArucoDictionaryHandle*>(result);
 }
 
 DetectorParametersHandle* createDetectorParameters() {
-    cv::Ptr<cv::aruco::DetectorParameters> params = cv::aruco::DetectorParameters::create();
+    // OpenCV 4.7+ removed DetectorParameters::create()
+    #if CV_VERSION_MAJOR > 4 || (CV_VERSION_MAJOR == 4 && CV_VERSION_MINOR >= 7)
+        cv::Ptr<cv::aruco::DetectorParameters> params = cv::makePtr<cv::aruco::DetectorParameters>();
+    #else
+        cv::Ptr<cv::aruco::DetectorParameters> params = cv::aruco::DetectorParameters::create();
+    #endif
+    
     cv::Ptr<cv::aruco::DetectorParameters>* params_ptr = new cv::Ptr<cv::aruco::DetectorParameters>(params);
     return reinterpret_cast<DetectorParametersHandle*>(params_ptr);
 }
