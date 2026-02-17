@@ -205,6 +205,23 @@ int libcamera_start_with_params(LibCameraContext* ctx, const struct CameraParame
             ctx->allocator = nullptr;
             return -1;
         }
+        
+        // Create requests for each allocated buffer (per libcamera docs pattern)
+        const auto &buffers = ctx->allocator->buffers(stream);
+        for (const auto &buffer : buffers) {
+            std::unique_ptr<Request> request = ctx->camera->createRequest();
+            if (!request) {
+                std::cerr << "Failed to create request" << std::endl;
+                return -1;
+            }
+            
+            if (request->addBuffer(stream, buffer.get()) < 0) {
+                std::cerr << "Failed to add buffer to request" << std::endl;
+                return -1;
+            }
+            
+            ctx->requests.push_back(std::move(request));
+        }
     }
 
     // Build control list from parameters
@@ -230,6 +247,23 @@ int libcamera_start(LibCameraContext* ctx) {
             delete ctx->allocator;
             ctx->allocator = nullptr;
             return -1;
+        }
+        
+        // Create requests for each allocated buffer (per libcamera docs pattern)
+        const auto &buffers = ctx->allocator->buffers(stream);
+        for (const auto &buffer : buffers) {
+            std::unique_ptr<Request> request = ctx->camera->createRequest();
+            if (!request) {
+                std::cerr << "Failed to create request" << std::endl;
+                return -1;
+            }
+            
+            if (request->addBuffer(stream, buffer.get()) < 0) {
+                std::cerr << "Failed to add buffer to request" << std::endl;
+                return -1;
+            }
+            
+            ctx->requests.push_back(std::move(request));
         }
     }
 
@@ -259,7 +293,9 @@ int libcamera_stop(LibCameraContext* ctx) {
     // Stop camera
     int ret = ctx->camera->stop();
     
-    // Free allocated buffers and delete allocator
+    // Clear requests and allocator for clean restart
+    ctx->requests.clear();
+    
     if (ctx->allocator) {
         delete ctx->allocator;
         ctx->allocator = nullptr;
@@ -280,34 +316,33 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
     if (!ctx || !ctx->camera || !ctx->allocator)
         return -1;
 
-    std::unique_ptr<Request> request = ctx->camera->createRequest();
-    if (!request)
+    // Use the first available request (per libcamera docs, reuse pattern)
+    if (ctx->requests.empty()) {
+        std::cerr << "No requests available" << std::endl;
         return -1;
-
-    Stream *stream = ctx->config->at(0).stream();
-    const auto &buffers = ctx->allocator->buffers(stream);
-    if (buffers.empty())
-        return -1;
-
-    request->addBuffer(stream, buffers[0].get());
-
+    }
+    
+    Request *request = ctx->requests[0].get();
+    
     // Reset completion flag
     {
         std::lock_guard<std::mutex> lock(ctx->request_mutex);
         ctx->completed_request = nullptr;
     }
-
-    Request *req_ptr = request.get();
-    int ret = ctx->camera->queueRequest(request.get());
-    if (ret < 0)
+    
+    // Queue request - libcamera will signal completion
+    int ret = ctx->camera->queueRequest(request);
+    if (ret < 0) {
+        std::cerr << "Failed to queue request" << std::endl;
         return -1;
+    }
 
     // Wait for request completion with timeout
     std::unique_lock<std::mutex> lock(ctx->request_mutex);
     bool completed = ctx->request_cv.wait_for(
         lock,
         std::chrono::milliseconds(timeout_ms),
-        [ctx, req_ptr]() { return ctx->completed_request == req_ptr; }
+        [ctx, request]() { return ctx->completed_request == request; }
     );
 
     if (!completed) {
@@ -321,6 +356,7 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
         return -1;
     }
 
+    Stream *stream = ctx->config->at(0).stream();
     FrameBuffer *buffer = ctx->completed_request->findBuffer(stream);
     if (!buffer) {
         std::cerr << "No buffer found in completed request" << std::endl;
@@ -334,7 +370,7 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
 
     // Map buffer and copy data to caller-owned buffer
     const FrameBuffer::Plane &plane = buffer->planes().front();
-    void *mem = mmap(nullptr, plane.length, PROT_READ, MAP_SHARED, plane.fd.get(), 0);
+    void *mem =mmap(nullptr, plane.length, PROT_READ, MAP_SHARED, plane.fd.get(), 0);
     if (mem == MAP_FAILED) {
         std::cerr << "Failed to mmap buffer" << std::endl;
         return -1;
@@ -347,6 +383,12 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
         munmap(mem, plane.length);
         return -1;
     }
+    
+    // Debug: Check if buffer size matches expectation
+    if (plane.length < data_size) {
+        std::cerr << "Warning: Buffer size mismatch - expected " << data_size 
+                  << " bytes but got " << plane.length << " bytes" << std::endl;
+    }
 
     // Copy data from mmap'd buffer
     memcpy(*out_buffer, mem, data_size);
@@ -354,6 +396,9 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
 
     // Unmap the buffer
     munmap(mem, plane.length);
+    
+    // Reuse request for next capture (per libcamera docs)
+    ctx->completed_request->reuse(Request::ReuseBuffers);
 
     return 0;
 }
@@ -371,21 +416,29 @@ void libcamera_cleanup(LibCameraContext* ctx) {
     }
 
     if (ctx->camera) {
-        // Disconnect signal handler before stopping
+        // Disconnect signal handler first
         ctx->camera->requestCompleted.disconnect(&request_completed_handler);
         
-        // Stop camera before deleting allocator
+        // Ensure camera is stopped (ignore error if already stopped)
         ctx->camera->stop();
     }
     
+    // Clear requests before deleting allocator
+    ctx->requests.clear();
+    
     // Delete allocator after camera is stopped
-    if (ctx->allocator)
+    if (ctx->allocator) {
         delete ctx->allocator;
+        ctx->allocator = nullptr;
+    }
 
-    // Release camera after allocator is deleted
-    if (ctx->camera)
+    // Release camera
+    if (ctx->camera) {
         ctx->camera->release();
+        ctx->camera.reset();
+    }
 
+    // Stop camera manager last
     if (ctx->camera_manager)
         ctx->camera_manager->stop();
 
