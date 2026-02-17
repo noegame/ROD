@@ -25,6 +25,7 @@ struct LibCameraContext {
     std::mutex request_mutex;
     std::condition_variable request_cv;
     Request *completed_request;
+    bool running;  // Flag to control continuous capture
 };
 
 // Static context pointer for signal callback (single camera support)
@@ -36,9 +37,17 @@ static void request_completed_handler(Request *request) {
     std::lock_guard<std::mutex> ctx_lock(g_context_mutex);
     
     if (g_active_context) {
-        std::lock_guard<std::mutex> lock(g_active_context->request_mutex);
-        g_active_context->completed_request = request;
-        g_active_context->request_cv.notify_one();
+        {
+            std::lock_guard<std::mutex> lock(g_active_context->request_mutex);
+            g_active_context->completed_request = request;
+            g_active_context->request_cv.notify_one();
+        }
+        
+        // Only requeue if camera is still running (prevents assertion error on stop)
+        if (g_active_context->running) {
+            request->reuse(Request::ReuseBuffers);
+            g_active_context->camera->queueRequest(request);
+        }
     }
 }
 
@@ -49,6 +58,7 @@ LibCameraContext* libcamera_init() {
     ctx->camera_manager = std::make_unique<CameraManager>();
     ctx->allocator = nullptr;
     ctx->completed_request = nullptr;
+    ctx->running = false;
 
     int ret = ctx->camera_manager->start();
     if (ret) {
@@ -230,6 +240,18 @@ int libcamera_start_with_params(LibCameraContext* ctx, const struct CameraParame
     // Apply controls and start camera
     if (ctx->camera->start(&controls) < 0)
         return -1;
+    
+    // Set running flag before queuing requests
+    ctx->running = true;
+    
+    // Queue all requests to start continuous capture (per libcamera docs)
+    for (auto &request : ctx->requests) {
+        if (ctx->camera->queueRequest(request.get()) < 0) {
+            std::cerr << "Failed to queue initial request" << std::endl;
+            ctx->running = false;
+            return -1;
+        }
+    }
 
     return 0;
 }
@@ -282,6 +304,18 @@ int libcamera_start(LibCameraContext* ctx) {
     // Apply controls and start camera
     if (ctx->camera->start(&controls) < 0)
         return -1;
+    
+    // Set running flag before queuing requests
+    ctx->running = true;
+    
+    // Queue all requests to start continuous capture (per libcamera docs)
+    for (auto &request : ctx->requests) {
+        if (ctx->camera->queueRequest(request.get()) < 0) {
+            std::cerr << "Failed to queue initial request" << std::endl;
+            ctx->running = false;
+            return -1;
+        }
+    }
 
     return 0;
 }
@@ -290,6 +324,12 @@ int libcamera_stop(LibCameraContext* ctx) {
     if (!ctx || !ctx->camera)
         return -1;
 
+    // Stop requeueing in callback before stopping camera
+    ctx->running = false;
+    
+    // Give time for any pending requests to complete without requeue
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
     // Stop camera
     int ret = ctx->camera->stop();
     
@@ -316,33 +356,18 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
     if (!ctx || !ctx->camera || !ctx->allocator)
         return -1;
 
-    // Use the first available request (per libcamera docs, reuse pattern)
-    if (ctx->requests.empty()) {
-        std::cerr << "No requests available" << std::endl;
-        return -1;
-    }
-    
-    Request *request = ctx->requests[0].get();
-    
-    // Reset completion flag
+    // Reset completion flag before waiting
     {
         std::lock_guard<std::mutex> lock(ctx->request_mutex);
         ctx->completed_request = nullptr;
     }
-    
-    // Queue request - libcamera will signal completion
-    int ret = ctx->camera->queueRequest(request);
-    if (ret < 0) {
-        std::cerr << "Failed to queue request" << std::endl;
-        return -1;
-    }
 
-    // Wait for request completion with timeout
+    // Wait for any request completion with timeout (continuous capture mode)
     std::unique_lock<std::mutex> lock(ctx->request_mutex);
     bool completed = ctx->request_cv.wait_for(
         lock,
         std::chrono::milliseconds(timeout_ms),
-        [ctx, request]() { return ctx->completed_request == request; }
+        [ctx]() { return ctx->completed_request != nullptr; }
     );
 
     if (!completed) {
@@ -397,8 +422,7 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
     // Unmap the buffer
     munmap(mem, plane.length);
     
-    // Reuse request for next capture (per libcamera docs)
-    ctx->completed_request->reuse(Request::ReuseBuffers);
+    // Note: request is automatically reused and requeued in callback handler
 
     return 0;
 }
@@ -419,8 +443,12 @@ void libcamera_cleanup(LibCameraContext* ctx) {
         // Disconnect signal handler first
         ctx->camera->requestCompleted.disconnect(&request_completed_handler);
         
-        // Ensure camera is stopped (ignore error if already stopped)
-        ctx->camera->stop();
+        // Stop camera if still running (ignore error if already stopped)
+        if (ctx->running) {
+            ctx->running = false;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            ctx->camera->stop();
+        }
     }
     
     // Clear requests before deleting allocator
