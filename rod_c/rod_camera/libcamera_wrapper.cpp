@@ -350,12 +350,20 @@ void libcamera_cleanup(LibCameraContext* ctx) {
     }
 
     if (ctx->camera) {
+        // Disconnect signal handler before stopping
+        ctx->camera->requestCompleted.disconnect(&request_completed_handler);
+        
+        // Stop camera before deleting allocator
         ctx->camera->stop();
-        ctx->camera->release();
     }
-
+    
+    // Delete allocator after camera is stopped
     if (ctx->allocator)
         delete ctx->allocator;
+
+    // Release camera after allocator is deleted
+    if (ctx->camera)
+        ctx->camera->release();
 
     if (ctx->camera_manager)
         ctx->camera_manager->stop();
