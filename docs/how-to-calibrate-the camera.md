@@ -1,5 +1,4 @@
 # Comment calibrer la caméra
-[readme](../README.md)
 
 Chaques caméra a des caractéristiques optiques qui lui sont propres. Ces caractéristiques peuvent introduire des distorsions dans les images capturées.
 Pour compenser ces distorsions et obtenir des mesures précises, il est essentiel de calibrer la caméra. La calibration permet de déterminer les paramètres intrinsèques et extrinsèques de la caméra, ainsi que les coefficients de distorsion.

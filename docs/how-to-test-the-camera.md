@@ -1,7 +1,8 @@
-## How to test the camera quickly
-[readme](../README.md)
+# How to test the camera quickly
 
-Vérifier que la caméra est bien détectée :
+On the raspberry pi, you can't use the librairie `libcamera` directly, you need to use the `rpicam` tools that are built on top of it. These tools are available in the `rpicam-tools` package.
+
+Check first if the camera is connected.
 ``` shell
 # Lister les caméras
 rpicam-hello --list-cameras
