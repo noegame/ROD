@@ -1,6 +1,8 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/aruco.hpp>
 #include "opencv_wrapper.h"
+#include <cstring>   // For strlen
+#include <cstdio>    // For fprintf
 
 extern "C" {
 
@@ -110,10 +112,38 @@ ImageHandle* convert_to_grayscale(ImageHandle* handle) {
 }
 
 int save_image(const char* path, ImageHandle* handle) {
-    if (handle == nullptr) return 0;
+    if (handle == nullptr) {
+        fprintf(stderr, "save_image: handle is null\n");
+        return 0;
+    }
     
     cv::Mat* image = reinterpret_cast<cv::Mat*>(handle);
-    return cv::imwrite(path, *image) ? 1 : 0;
+    
+    // Validate image is not empty
+    if (image->empty()) {
+        fprintf(stderr, "save_image: image is empty\n");
+        return 0;
+    }
+    
+    // Validate image has valid dimensions
+    if (image->cols <= 0 || image->rows <= 0) {
+        fprintf(stderr, "save_image: invalid dimensions %dx%d\n", image->cols, image->rows);
+        return 0;
+    }
+    
+    // Validate path is not null
+    if (path == nullptr || strlen(path) == 0) {
+        fprintf(stderr, "save_image: invalid path\n");
+        return 0;
+    }
+    
+    // Try to save the image
+    bool success = cv::imwrite(path, *image);
+    if (!success) {
+        fprintf(stderr, "save_image: cv::imwrite failed for path %s\n", path);
+    }
+    
+    return success ? 1 : 0;
 }
 
 // Structure to hold detector state for OpenCV 4.6 compatibility

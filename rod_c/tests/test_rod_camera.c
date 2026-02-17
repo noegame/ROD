@@ -15,6 +15,7 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <time.h>
+#include <errno.h>
 
 // Test configuration structure
 typedef struct {
@@ -167,6 +168,28 @@ static const TestConfig TEST_CONFIGS[] = {
             .frame_duration_min = -1,
             .frame_duration_max = -1
         }
+    },
+    
+    // IMX477 tuning file inspired configuration
+    // Based on /usr/share/libcamera/ipa/rpi/pisp/imx477.json
+    // Uses default exposure mode parameters: shutter 10000-66666us, gain 1.0-16.0
+    {
+        .name = "imx477_tuned",
+        .category = "optimized",
+        .params = {
+            .ae_enable = 1,  // Auto-exposure (will use IMX477 exposure curves)
+            .exposure_time = -1,  // Let AE decide based on tuning file
+            .analogue_gain = -1,  // Let AE decide based on tuning file
+            .noise_reduction_mode = 2,  // HighQuality (matches denoise settings)
+            .sharpness = 1.0,   // Default sharpen strength from imx477.json
+            .contrast = 1.0,    // CE enabled with gamma curve in tuning file
+            .brightness = 0.0,
+            .saturation = 1.0,  // Default saturation
+            .awb_enable = 1,    // Auto white balance
+            .colour_temperature = -1,  // Let AWB decide
+            .frame_duration_min = -1,
+            .frame_duration_max = -1
+        }
     }
 };
 
@@ -174,19 +197,40 @@ static const TestConfig TEST_CONFIGS[] = {
 
 /**
  * Create directory recursively (like mkdir -p)
+ * Returns 0 on success, -1 on failure
  */
 static int create_directory_recursive(const char* path) {
     char tmp[512];
+    struct stat st;
+    
+    // Check if directory already exists
+    if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
+        return 0;  // Already exists
+    }
+    
     snprintf(tmp, sizeof(tmp), "%s", path);
     
     for (char* p = tmp + 1; *p; p++) {
         if (*p == '/') {
             *p = '\0';
-            mkdir(tmp, 0755);
+            if (stat(tmp, &st) != 0) {
+                if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+                    fprintf(stderr, "Failed to create directory %s: %s\n", tmp, strerror(errno));
+                    return -1;
+                }
+            }
             *p = '/';
         }
     }
-    mkdir(tmp, 0755);  // Create final directory
+    
+    // Create final directory
+    if (stat(tmp, &st) != 0) {
+        if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+            fprintf(stderr, "Failed to create directory %s: %s\n", tmp, strerror(errno));
+            return -1;
+        }
+    }
+    
     return 0;
 }
 
@@ -303,6 +347,22 @@ static int test_single_config(const TestConfig* config, int width, int height, c
         printf("  Average BGR: (%lu, %lu, %lu)\n", avg_b, avg_g, avg_r);
     }
     
+    // Validate buffer
+    if (!buffer) {
+        fprintf(stderr, "Failed to get buffer from camera\n");
+        camera_stop(camera);
+        camera_cleanup(camera);
+        return -1;
+    }
+    
+    if (img_size == 0 || img_width <= 0 || img_height <= 0) {
+        fprintf(stderr, "Invalid image dimensions: %dx%d, size=%zu\n", img_width, img_height, img_size);
+        free(buffer);
+        camera_stop(camera);
+        camera_cleanup(camera);
+        return -1;
+    }
+    
     // Create OpenCV image
     ImageHandle* image = create_image_from_buffer(buffer, img_width, img_height, 3, 0);
     free(buffer);
@@ -322,7 +382,13 @@ static int test_single_config(const TestConfig* config, int width, int height, c
     // Create category directory
     char category_dir[512];
     snprintf(category_dir, sizeof(category_dir), "%s/%s", output_dir, config->category);
-    create_directory_recursive(category_dir);
+    if (create_directory_recursive(category_dir) != 0) {
+        fprintf(stderr, "Failed to create category directory: %s\n", category_dir);
+        release_image(image);
+        camera_stop(camera);
+        camera_cleanup(camera);
+        return -1;
+    }
     
     // Save image
     printf("  Saving to %s...\n", output_path);
