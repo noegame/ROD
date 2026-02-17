@@ -105,12 +105,12 @@ static ControlList build_control_list(const struct CameraParameters* params) {
     }
     // Map to libcamera enum
     switch (nr_mode) {
-        case 0: controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeOff)); break;
-        case 1: controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeFast)); break;
-        case 2: controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeHighQuality)); break;
-        case 3: controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeMinimal)); break;
-        case 4: controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeZSL)); break;
-        default: controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeHighQuality));
+        case 0: controls.set(controls::draft::NoiseReductionMode, static_cast<int32_t>(controls::draft::NoiseReductionModeOff)); break;
+        case 1: controls.set(controls::draft::NoiseReductionMode, static_cast<int32_t>(controls::draft::NoiseReductionModeFast)); break;
+        case 2: controls.set(controls::draft::NoiseReductionMode, static_cast<int32_t>(controls::draft::NoiseReductionModeHighQuality)); break;
+        case 3: controls.set(controls::draft::NoiseReductionMode, static_cast<int32_t>(controls::draft::NoiseReductionModeMinimal)); break;
+        case 4: controls.set(controls::draft::NoiseReductionMode, static_cast<int32_t>(controls::draft::NoiseReductionModeZSL)); break;
+        default: controls.set(controls::draft::NoiseReductionMode, static_cast<int32_t>(controls::draft::NoiseReductionModeHighQuality));
     }
     
     // Sharpness (default: 1.0)
@@ -196,7 +196,7 @@ int libcamera_start(LibCameraContext* ctx) {
     controls.set(controls::AeEnable, true);
     
     // Set noise reduction to high quality (from camera.txt: NoiseReductionMode.HighQuality = 2)
-    controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeHighQuality));
+    controls.set(controls::draft::NoiseReductionMode, static_cast<int32_t>(controls::draft::NoiseReductionModeHighQuality));
     
     // Set frame duration limits (from camera.txt: (100, 1000000000) = 100ns to 1s)
     controls.set(controls::FrameDurationLimits, Span<const int64_t, 2>({static_cast<int64_t>(100), static_cast<int64_t>(1000000000)}));
