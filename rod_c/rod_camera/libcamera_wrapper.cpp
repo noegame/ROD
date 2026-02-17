@@ -37,17 +37,10 @@ static void request_completed_handler(Request *request) {
     std::lock_guard<std::mutex> ctx_lock(g_context_mutex);
     
     if (g_active_context) {
-        {
-            std::lock_guard<std::mutex> lock(g_active_context->request_mutex);
-            g_active_context->completed_request = request;
-            g_active_context->request_cv.notify_one();
-        }
-        
-        // Only requeue if camera is still running (prevents assertion error on stop)
-        if (g_active_context->running) {
-            request->reuse(Request::ReuseBuffers);
-            g_active_context->camera->queueRequest(request);
-        }
+        std::lock_guard<std::mutex> lock(g_active_context->request_mutex);
+        g_active_context->completed_request = request;
+        g_active_context->request_cv.notify_one();
+        // Note: Do NOT requeue here - let capture_frame do it after processing buffer
     }
 }
 
@@ -375,9 +368,9 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
         return -1;
     }
 
-    // Check request status
-    if (ctx->completed_request->status() != Request::RequestComplete) {
-        std::cerr << "Request failed with status: " << ctx->completed_request->status() << std::endl;
+    // Check request status (only reject if cancelled)
+    if (ctx->completed_request->status() == Request::RequestCancelled) {
+        std::cerr << "Request was cancelled" << std::endl;
         return -1;
     }
 
@@ -422,7 +415,12 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
     // Unmap the buffer
     munmap(mem, plane.length);
     
-    // Note: request is automatically reused and requeued in callback handler
+    // Reuse and requeue request for next capture (per libcamera docs)
+    // Do this AFTER buffer processing to avoid race condition
+    if (ctx->running) {
+        ctx->completed_request->reuse(Request::ReuseBuffers);
+        ctx->camera->queueRequest(ctx->completed_request);
+    }
 
     return 0;
 }
