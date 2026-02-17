@@ -11,10 +11,14 @@ extern "C" {
 // Opaque handle to LibCamera context (actual definition in .cpp file)
 typedef struct LibCameraContext LibCameraContext;
 
+// Forward declaration - full definition in camera.h
+struct CameraParameters;
+
 LibCameraContext* libcamera_init();
 int libcamera_open_camera(LibCameraContext* ctx, int camera_index);
 int libcamera_configure(LibCameraContext* ctx, int width, int height);
 int libcamera_start(LibCameraContext* ctx);
+int libcamera_start_with_params(LibCameraContext* ctx, const struct CameraParameters* params);
 int libcamera_stop(LibCameraContext* ctx);
 int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
                             int* out_width, int* out_height,

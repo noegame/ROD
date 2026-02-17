@@ -29,7 +29,7 @@
 #define ROD_SAVE_DEBUG_IMAGE_INTERVAL 1  // Save every N frames
 
 // Default paths
-#define ROD_DEFAULT_IMAGE_FOLDER "pictures/2026-01-16-playground-ready"
+#define ROD_DEFAULT_IMAGE_FOLDER "pictures/camera/2026-01-16-playground-ready"
 
 /* ************************************************** Public types definition ******************************************** */
 

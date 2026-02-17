@@ -35,7 +35,7 @@
 #define DEFAULT_IMAGE_FOLDER ROD_DEFAULT_IMAGE_FOLDER
 
 // Debug image output folder
-#define DEBUG_OUTPUT_FOLDER ROD_DEBUG_OUTPUT_FOLDER
+#define DEBUG_OUTPUT_FOLDER "pictures/debug/rod_detection"
 
 // Socket configuration
 #define SOCKET_PATH ROD_SOCKET_PATH

@@ -1,4 +1,5 @@
 #include "libcamera_wrapper.h"
+#include "camera.h"
 #include <libcamera/libcamera.h>
 #include <memory>
 #include <iostream>
@@ -73,6 +74,111 @@ int libcamera_configure(LibCameraContext* ctx, int width, int height) {
     return 0;
 }
 
+/**
+ * Build ControlList based on CameraParameters.
+ * If params is NULL or a field is -1, use default value.
+ */
+static ControlList build_control_list(const struct CameraParameters* params) {
+    ControlList controls;
+    
+    // Auto-exposure (default: true)
+    bool ae_enable = true;
+    if (params && params->ae_enable >= 0) {
+        ae_enable = (params->ae_enable != 0);
+    }
+    controls.set(controls::AeEnable, ae_enable);
+    
+    // Manual exposure time (only if AE is disabled)
+    if (params && !ae_enable && params->exposure_time >= 0) {
+        controls.set(controls::ExposureTime, static_cast<int32_t>(params->exposure_time));
+    }
+    
+    // Analogue gain (manual or hint for AE)
+    if (params && params->analogue_gain >= 0.0) {
+        controls.set(controls::AnalogueGain, static_cast<float>(params->analogue_gain));
+    }
+    
+    // Noise reduction mode (default: HighQuality = 2)
+    int nr_mode = 2; // HighQuality
+    if (params && params->noise_reduction_mode >= 0) {
+        nr_mode = params->noise_reduction_mode;
+    }
+    // Map to libcamera enum
+    switch (nr_mode) {
+        case 0: controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeOff)); break;
+        case 1: controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeFast)); break;
+        case 2: controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeHighQuality)); break;
+        case 3: controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeMinimal)); break;
+        case 4: controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeZSL)); break;
+        default: controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeHighQuality));
+    }
+    
+    // Sharpness (default: 1.0)
+    if (params && params->sharpness >= 0.0) {
+        controls.set(controls::Sharpness, static_cast<float>(params->sharpness));
+    }
+    
+    // Contrast (default: 1.0)
+    if (params && params->contrast >= 0.0) {
+        controls.set(controls::Contrast, static_cast<float>(params->contrast));
+    }
+    
+    // Brightness (default: 0.0)
+    if (params && params->brightness >= -1.0) {
+        controls.set(controls::Brightness, static_cast<float>(params->brightness));
+    }
+    
+    // Saturation (default: 1.0)
+    if (params && params->saturation >= 0.0) {
+        controls.set(controls::Saturation, static_cast<float>(params->saturation));
+    }
+    
+    // Auto white balance (default: true)
+    bool awb_enable = true;
+    if (params && params->awb_enable >= 0) {
+        awb_enable = (params->awb_enable != 0);
+    }
+    controls.set(controls::AwbEnable, awb_enable);
+    
+    // Colour temperature (only if AWB is disabled)
+    if (params && !awb_enable && params->colour_temperature >= 0) {
+        controls.set(controls::ColourTemperature, static_cast<int32_t>(params->colour_temperature));
+    }
+    
+    // Frame duration limits (default: 100ns to 1s)
+    int64_t frame_min = 100;
+    int64_t frame_max = 1000000000;
+    if (params && params->frame_duration_min >= 0) {
+        frame_min = params->frame_duration_min;
+    }
+    if (params && params->frame_duration_max >= 0) {
+        frame_max = params->frame_duration_max;
+    }
+    controls.set(controls::FrameDurationLimits, Span<const int64_t, 2>({frame_min, frame_max}));
+    
+    return controls;
+}
+
+int libcamera_start_with_params(LibCameraContext* ctx, const struct CameraParameters* params) {
+    if (!ctx || !ctx->camera)
+        return -1;
+
+    ctx->allocator = new FrameBufferAllocator(ctx->camera);
+
+    Stream *stream = ctx->config->at(0).stream();
+    if (ctx->allocator->allocate(stream) < 0)
+        return -1;
+
+    // Build control list from parameters
+    ControlList controls = build_control_list(params);
+    
+    // Apply controls and start camera
+    if (ctx->camera->start(&controls) < 0)
+        return -1;
+
+    return 0;
+}
+
 int libcamera_start(LibCameraContext* ctx) {
     if (!ctx || !ctx->camera)
         return -1;
@@ -90,7 +196,7 @@ int libcamera_start(LibCameraContext* ctx) {
     controls.set(controls::AeEnable, true);
     
     // Set noise reduction to high quality (from camera.txt: NoiseReductionMode.HighQuality = 2)
-    controls.set(controls::draft::NoiseReductionModeEnum, controls::draft::NoiseReductionModeHighQuality);
+    controls.set(controls::NoiseReductionMode, static_cast<int32_t>(controls::NoiseReductionModeHighQuality));
     
     // Set frame duration limits (from camera.txt: (100, 1000000000) = 100ns to 1s)
     controls.set(controls::FrameDurationLimits, Span<const int64_t, 2>({static_cast<int64_t>(100), static_cast<int64_t>(1000000000)}));

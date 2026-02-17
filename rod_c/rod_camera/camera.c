@@ -17,6 +17,7 @@ struct CameraContext {
     int height;
     int configured;
     int started;
+    CameraParameters params;
 };
 
 CameraContext* camera_init() {
@@ -45,6 +46,7 @@ CameraContext* camera_init() {
     ctx->height = 480;
     ctx->configured = 0;
     ctx->started = 0;
+    ctx->params = camera_default_parameters();
 
     return ctx;
 }
@@ -62,6 +64,20 @@ int camera_set_size(CameraContext* ctx, int width, int height) {
     ctx->width = width;
     ctx->height = height;
 
+    return 0;
+}
+
+int camera_set_parameters(CameraContext* ctx, const CameraParameters* params) {
+    if (!ctx || !params) {
+        return -1;
+    }
+
+    if (ctx->started) {
+        fprintf(stderr, "Cannot set parameters after camera is started\n");
+        return -1;
+    }
+
+    ctx->params = *params;
     return 0;
 }
 
@@ -83,8 +99,8 @@ int camera_start(CameraContext* ctx) {
         ctx->configured = 1;
     }
 
-    // Start camera
-    if (libcamera_start(ctx->libcamera_ctx) != 0) {
+    // Start camera with parameters
+    if (libcamera_start_with_params(ctx->libcamera_ctx, &ctx->params) != 0) {
         fprintf(stderr, "Failed to start camera\n");
         return -1;
     }
