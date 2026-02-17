@@ -27,6 +27,21 @@ struct LibCameraContext {
     Request *completed_request;
 };
 
+// Static context pointer for signal callback (single camera support)
+static LibCameraContext *g_active_context = nullptr;
+static std::mutex g_context_mutex;
+
+// Static callback handler for request completion signal
+static void request_completed_handler(Request *request) {
+    std::lock_guard<std::mutex> ctx_lock(g_context_mutex);
+    
+    if (g_active_context) {
+        std::lock_guard<std::mutex> lock(g_active_context->request_mutex);
+        g_active_context->completed_request = request;
+        g_active_context->request_cv.notify_one();
+    }
+}
+
 extern "C" {
 
 LibCameraContext* libcamera_init() {
@@ -57,14 +72,14 @@ int libcamera_open_camera(LibCameraContext* ctx, int camera_index) {
         return -1;
     }
 
-    // Set up request completion handler
-    ctx->camera->requestCompleted.connect(
-        [ctx](Request *request) {
-            std::lock_guard<std::mutex> lock(ctx->request_mutex);
-            ctx->completed_request = request;
-            ctx->request_cv.notify_one();
-        }
-    );
+    // Register this context as the active one
+    {
+        std::lock_guard<std::mutex> lock(g_context_mutex);
+        g_active_context = ctx;
+    }
+
+    // Connect static callback handler for request completion
+    ctx->camera->requestCompleted.connect(&request_completed_handler);
 
     return 0;
 }
@@ -325,6 +340,14 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
 void libcamera_cleanup(LibCameraContext* ctx) {
     if (!ctx)
         return;
+
+    // Unregister context if it's the active one
+    {
+        std::lock_guard<std::mutex> lock(g_context_mutex);
+        if (g_active_context == ctx) {
+            g_active_context = nullptr;
+        }
+    }
 
     if (ctx->camera) {
         ctx->camera->stop();
