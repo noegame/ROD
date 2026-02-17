@@ -312,9 +312,13 @@ static int test_single_config(const TestConfig* config, int width, int height, c
         uint8_t* warmup_buffer = NULL;
         int w, h;
         size_t s;
-        if (camera_take_picture(camera, &warmup_buffer, &w, &h, &s) == 0) {
-            free(warmup_buffer);
+        if (camera_take_picture(camera, &warmup_buffer, &w, &h, &s) != 0) {
+            fprintf(stderr, "  ERROR: Warmup frame %d/%d failed\n", i + 1, warmup_frames);
+            camera_stop(camera);
+            camera_cleanup(camera);
+            return -1;
         }
+        free(warmup_buffer);
         usleep(200000);  // 200ms between frames
     }
     

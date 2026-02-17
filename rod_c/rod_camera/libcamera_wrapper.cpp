@@ -8,6 +8,7 @@
 #include <cstring>
 #include <sys/mman.h>
 #include <vector>
+#include <queue>
 #include <condition_variable>
 #include <mutex>
 
@@ -24,7 +25,7 @@ struct LibCameraContext {
     // Synchronization for request completion
     std::mutex request_mutex;
     std::condition_variable request_cv;
-    Request *completed_request;
+    std::queue<Request*> completed_requests;  // Queue of completed requests (not just one)
     bool running;  // Flag to control continuous capture
 };
 
@@ -33,14 +34,30 @@ static LibCameraContext *g_active_context = nullptr;
 static std::mutex g_context_mutex;
 
 // Static callback handler for request completion signal
+// Follows libcamera pattern: add to queue, requeue immediately, notify
 static void request_completed_handler(Request *request) {
     std::lock_guard<std::mutex> ctx_lock(g_context_mutex);
     
-    if (g_active_context) {
+    if (!g_active_context || !request) return;
+    
+    {
         std::lock_guard<std::mutex> lock(g_active_context->request_mutex);
-        g_active_context->completed_request = request;
-        g_active_context->request_cv.notify_one();
-        // Note: Do NOT requeue here - let capture_frame do it after processing buffer
+        
+        // Add to queue for processing (only if status is good)
+        if (request->status() == Request::RequestComplete) {
+            g_active_context->completed_requests.push(request);
+            g_active_context->request_cv.notify_one();
+        } else if (request->status() == Request::RequestCancelled) {
+            // Don't queue cancelled requests
+            std::cerr << "Request cancelled in callback" << std::endl;
+        }
+    }
+    
+    // Requeue immediately for continuous capture (standard libcamera pattern)
+    // This happens OUTSIDE the queue lock to avoid deadlock
+    if (g_active_context->running && request->status() == Request::RequestComplete) {
+        request->reuse(Request::ReuseBuffers);
+        g_active_context->camera->queueRequest(request);
     }
 }
 
@@ -50,7 +67,7 @@ LibCameraContext* libcamera_init() {
     LibCameraContext* ctx = new LibCameraContext();
     ctx->camera_manager = std::make_unique<CameraManager>();
     ctx->allocator = nullptr;
-    ctx->completed_request = nullptr;
+    // completed_requests queue is constructed empty by default
     ctx->running = false;
 
     int ret = ctx->camera_manager->start();
@@ -249,70 +266,6 @@ int libcamera_start_with_params(LibCameraContext* ctx, const struct CameraParame
     return 0;
 }
 
-int libcamera_start(LibCameraContext* ctx) {
-    if (!ctx || !ctx->camera)
-        return -1;
-
-    // Only create allocator if it doesn't exist (prevents memory leak)
-    if (!ctx->allocator) {
-        ctx->allocator = new FrameBufferAllocator(ctx->camera);
-
-        Stream *stream = ctx->config->at(0).stream();
-        if (ctx->allocator->allocate(stream) < 0) {
-            delete ctx->allocator;
-            ctx->allocator = nullptr;
-            return -1;
-        }
-        
-        // Create requests for each allocated buffer (per libcamera docs pattern)
-        const auto &buffers = ctx->allocator->buffers(stream);
-        for (const auto &buffer : buffers) {
-            std::unique_ptr<Request> request = ctx->camera->createRequest();
-            if (!request) {
-                std::cerr << "Failed to create request" << std::endl;
-                return -1;
-            }
-            
-            if (request->addBuffer(stream, buffer.get()) < 0) {
-                std::cerr << "Failed to add buffer to request" << std::endl;
-                return -1;
-            }
-            
-            ctx->requests.push_back(std::move(request));
-        }
-    }
-
-    // Configure camera controls (matching Python picamera2 settings)
-    ControlList controls;
-    
-    // Enable auto-exposure (critical for proper exposure)
-    controls.set(controls::AeEnable, true);
-    
-    // Set noise reduction to high quality (from camera.txt: NoiseReductionMode.HighQuality = 2)
-    controls.set(controls::draft::NoiseReductionMode, static_cast<int32_t>(controls::draft::NoiseReductionModeHighQuality));
-    
-    // Set frame duration limits (from camera.txt: (100, 1000000000) = 100ns to 1s)
-    controls.set(controls::FrameDurationLimits, Span<const int64_t, 2>({static_cast<int64_t>(100), static_cast<int64_t>(1000000000)}));
-    
-    // Apply controls and start camera
-    if (ctx->camera->start(&controls) < 0)
-        return -1;
-    
-    // Set running flag before queuing requests
-    ctx->running = true;
-    
-    // Queue all requests to start continuous capture (per libcamera docs)
-    for (auto &request : ctx->requests) {
-        if (ctx->camera->queueRequest(request.get()) < 0) {
-            std::cerr << "Failed to queue initial request" << std::endl;
-            ctx->running = false;
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
 int libcamera_stop(LibCameraContext* ctx) {
     if (!ctx || !ctx->camera)
         return -1;
@@ -325,6 +278,14 @@ int libcamera_stop(LibCameraContext* ctx) {
     
     // Stop camera
     int ret = ctx->camera->stop();
+    
+    // Clear the completed requests queue
+    {
+        std::lock_guard<std::mutex> lock(ctx->request_mutex);
+        while (!ctx->completed_requests.empty()) {
+            ctx->completed_requests.pop();
+        }
+    }
     
     // Clear requests and allocator for clean restart
     ctx->requests.clear();
@@ -342,6 +303,9 @@ int libcamera_stop(LibCameraContext* ctx) {
  * Returns BGR888 format buffer (OpenCV native format).
  * The caller must free() the returned buffer.
  * Returns 0 on success, -1 on failure.
+ * 
+ * Note: Requests are automatically requeued by the completion callback,
+ * so this function only waits for and processes the buffer.
  */
 int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
                             int* out_width, int* out_height,
@@ -349,33 +313,32 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
     if (!ctx || !ctx->camera || !ctx->allocator)
         return -1;
 
-    // Reset completion flag before waiting
-    {
-        std::lock_guard<std::mutex> lock(ctx->request_mutex);
-        ctx->completed_request = nullptr;
-    }
-
-    // Wait for any request completion with timeout (continuous capture mode)
+    // Wait for a completed request to be available in the queue
     std::unique_lock<std::mutex> lock(ctx->request_mutex);
-    bool completed = ctx->request_cv.wait_for(
+    bool has_request = ctx->request_cv.wait_for(
         lock,
         std::chrono::milliseconds(timeout_ms),
-        [ctx]() { return ctx->completed_request != nullptr; }
+        [ctx]() { return !ctx->completed_requests.empty(); }
     );
 
-    if (!completed) {
+    if (!has_request) {
         std::cerr << "Frame capture timeout after " << timeout_ms << "ms" << std::endl;
         return -1;
     }
 
-    // Check request status (only reject if cancelled)
-    if (ctx->completed_request->status() == Request::RequestCancelled) {
-        std::cerr << "Request was cancelled" << std::endl;
+    // Pop the oldest completed request from the queue
+    Request* request = ctx->completed_requests.front();
+    ctx->completed_requests.pop();
+    lock.unlock();  // Release lock while processing buffer
+
+    if (!request) {
+        std::cerr << "Null request in queue" << std::endl;
         return -1;
     }
 
+    // Get buffer from request
     Stream *stream = ctx->config->at(0).stream();
-    FrameBuffer *buffer = ctx->completed_request->findBuffer(stream);
+    FrameBuffer *buffer = request->findBuffer(stream);
     if (!buffer) {
         std::cerr << "No buffer found in completed request" << std::endl;
         return -1;
@@ -388,7 +351,7 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
 
     // Map buffer and copy data to caller-owned buffer
     const FrameBuffer::Plane &plane = buffer->planes().front();
-    void *mem =mmap(nullptr, plane.length, PROT_READ, MAP_SHARED, plane.fd.get(), 0);
+    void *mem = mmap(nullptr, plane.length, PROT_READ, MAP_SHARED, plane.fd.get(), 0);
     if (mem == MAP_FAILED) {
         std::cerr << "Failed to mmap buffer" << std::endl;
         return -1;
@@ -415,12 +378,7 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
     // Unmap the buffer
     munmap(mem, plane.length);
     
-    // Reuse and requeue request for next capture (per libcamera docs)
-    // Do this AFTER buffer processing to avoid race condition
-    if (ctx->running) {
-        ctx->completed_request->reuse(Request::ReuseBuffers);
-        ctx->camera->queueRequest(ctx->completed_request);
-    }
+    // Request is already requeued by the callback - nothing more to do here
 
     return 0;
 }
@@ -446,6 +404,14 @@ void libcamera_cleanup(LibCameraContext* ctx) {
             ctx->running = false;
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             ctx->camera->stop();
+        }
+    }
+    
+    // Clear the completed requests queue
+    {
+        std::lock_guard<std::mutex> lock(ctx->request_mutex);
+        while (!ctx->completed_requests.empty()) {
+            ctx->completed_requests.pop();
         }
     }
     
