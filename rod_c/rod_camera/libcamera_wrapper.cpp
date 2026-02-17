@@ -8,6 +8,8 @@
 #include <cstring>
 #include <sys/mman.h>
 #include <vector>
+#include <condition_variable>
+#include <mutex>
 
 using namespace libcamera;
 
@@ -18,6 +20,11 @@ struct LibCameraContext {
     std::unique_ptr<CameraConfiguration> config;
     FrameBufferAllocator *allocator;
     std::vector<std::unique_ptr<Request>> requests;
+    
+    // Synchronization for request completion
+    std::mutex request_mutex;
+    std::condition_variable request_cv;
+    Request *completed_request;
 };
 
 extern "C" {
@@ -26,6 +33,7 @@ LibCameraContext* libcamera_init() {
     LibCameraContext* ctx = new LibCameraContext();
     ctx->camera_manager = std::make_unique<CameraManager>();
     ctx->allocator = nullptr;
+    ctx->completed_request = nullptr;
 
     int ret = ctx->camera_manager->start();
     if (ret) {
@@ -48,6 +56,15 @@ int libcamera_open_camera(LibCameraContext* ctx, int camera_index) {
     if (ctx->camera->acquire()) {
         return -1;
     }
+
+    // Set up request completion handler
+    ctx->camera->requestCompleted.connect(
+        [ctx](Request *request) {
+            std::lock_guard<std::mutex> lock(ctx->request_mutex);
+            ctx->completed_request = request;
+            ctx->request_cv.notify_one();
+        }
+    );
 
     return 0;
 }
@@ -238,17 +255,41 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
 
     request->addBuffer(stream, buffers[0].get());
 
+    // Reset completion flag
+    {
+        std::lock_guard<std::mutex> lock(ctx->request_mutex);
+        ctx->completed_request = nullptr;
+    }
+
+    Request *req_ptr = request.get();
     int ret = ctx->camera->queueRequest(request.get());
     if (ret < 0)
         return -1;
 
-    // Wait for completion - simplified synchronous approach
-    // For MVP: poll with sleep (proper event loop could be added later)
-    std::this_thread::sleep_for(std::chrono::milliseconds(timeout_ms));
+    // Wait for request completion with timeout
+    std::unique_lock<std::mutex> lock(ctx->request_mutex);
+    bool completed = ctx->request_cv.wait_for(
+        lock,
+        std::chrono::milliseconds(timeout_ms),
+        [ctx, req_ptr]() { return ctx->completed_request == req_ptr; }
+    );
 
-    FrameBuffer *buffer = request->findBuffer(stream);
-    if (!buffer)
+    if (!completed) {
+        std::cerr << "Frame capture timeout after " << timeout_ms << "ms" << std::endl;
         return -1;
+    }
+
+    // Check request status
+    if (ctx->completed_request->status() != Request::RequestComplete) {
+        std::cerr << "Request failed with status: " << ctx->completed_request->status() << std::endl;
+        return -1;
+    }
+
+    FrameBuffer *buffer = ctx->completed_request->findBuffer(stream);
+    if (!buffer) {
+        std::cerr << "No buffer found in completed request" << std::endl;
+        return -1;
+    }
 
     // Get stream configuration for dimensions
     const StreamConfiguration &cfg = ctx->config->at(0);
@@ -258,8 +299,10 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
     // Map buffer and copy data to caller-owned buffer
     const FrameBuffer::Plane &plane = buffer->planes().front();
     void *mem = mmap(nullptr, plane.length, PROT_READ, MAP_SHARED, plane.fd.get(), 0);
-    if (mem == MAP_FAILED)
+    if (mem == MAP_FAILED) {
+        std::cerr << "Failed to mmap buffer" << std::endl;
         return -1;
+    }
 
     // Allocate buffer for caller (BGR888: 3 bytes per pixel)
     size_t data_size = (*out_width) * (*out_height) * 3;
