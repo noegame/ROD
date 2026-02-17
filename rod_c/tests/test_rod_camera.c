@@ -7,6 +7,7 @@
 
 #include "camera.h"
 #include "../rod_cv/opencv_wrapper.h"
+#include "../rod_config/rod_config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -349,7 +350,7 @@ static int test_single_config(const TestConfig* config, int width, int height, c
 int main(int argc, char* argv[]) {
     int width = 640;
     int height = 480;
-    const char* output_dir = "pictures/camera_tests";
+    const char* output_dir = ROD_CAMERA_TESTS_OUTPUT_FOLDER;
     
     // Parse optional arguments: [width] [height] [output_dir]
     if (argc >= 3) {

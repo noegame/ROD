@@ -25,8 +25,11 @@
 #define ROD_MAX_DETECTION_SIZE 1024
 
 // Debug configuration
-#define ROD_DEBUG_OUTPUT_FOLDER "pictures/debug"
+#define ROD_DEBUG_OUTPUT_FOLDER "/var/roboteseo/pictures/debug"
 #define ROD_SAVE_DEBUG_IMAGE_INTERVAL 1  // Save every N frames
+
+// Camera test configuration
+#define ROD_CAMERA_TESTS_OUTPUT_FOLDER "/var/roboteseo/pictures/camera_tests"
 
 // Default paths
 #define ROD_DEFAULT_IMAGE_FOLDER "pictures/camera/2026-01-16-playground-ready"
