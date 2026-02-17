@@ -15,7 +15,7 @@
 
 /* ******************************************************* Includes ****************************************************** */
 
-#include "emulated_camera.h"
+#include "camera_interface.h"
 #include "opencv_wrapper.h"
 #include "rod_cv.h"
 #include "rod_config.h"
@@ -53,7 +53,7 @@
  * @brief Application context
  */
 typedef struct {
-    EmulatedCameraContext* camera;
+    Camera* camera;
     ArucoDetectorHandle* detector;
     ArucoDictionaryHandle* dictionary;
     DetectorParametersHandle* params;
@@ -67,10 +67,11 @@ typedef struct {
 /**
  * @brief Initialize application context
  * @param ctx Application context
- * @param image_folder Path to image folder
+ * @param camera_type Camera type (CAMERA_TYPE_REAL or CAMERA_TYPE_EMULATED)
+ * @param image_folder Path to image folder (for emulated camera)
  * @return 0 on success, -1 on failure
  */
-static int init_app_context(AppContext* ctx, const char* image_folder);
+static int init_app_context(AppContext* ctx, CameraType camera_type, const char* image_folder);
 
 /**
  * @brief Cleanup application context
@@ -98,31 +99,43 @@ static void signal_handler(int signum) {
     printf("\nReceived interrupt signal, shutting down...\n");
 }
 
-static int init_app_context(AppContext* ctx, const char* image_folder) {
+static int init_app_context(AppContext* ctx, CameraType camera_type, const char* image_folder) {
     memset(ctx, 0, sizeof(AppContext));
     ctx->socket_server = NULL;
     ctx->running = true;
     
-    // Initialize emulated camera
-    printf("Initializing emulated camera...\n");
-    ctx->camera = emulated_camera_init();
+    // Initialize camera based on type
+    printf("Initializing %s camera...\n", 
+           camera_type == CAMERA_TYPE_REAL ? "real" : "emulated");
+    ctx->camera = camera_create(camera_type);
     if (!ctx->camera) {
-        fprintf(stderr, "Failed to initialize emulated camera\n");
+        fprintf(stderr, "Failed to initialize camera\n");
         return -1;
     }
     
-    // Set camera folder
-    if (emulated_camera_set_folder(ctx->camera, image_folder) != 0) {
-        fprintf(stderr, "Failed to set image folder: %s\n", image_folder);
-        return -1;
+    // Configure camera based on type
+    if (camera_type == CAMERA_TYPE_EMULATED) {
+        // Set image folder for emulated camera
+        if (camera_interface_set_folder(ctx->camera, image_folder) != 0) {
+            fprintf(stderr, "Failed to set image folder: %s\n", image_folder);
+            return -1;
+        }
+        printf("Emulated camera folder: %s\n", image_folder);
+    } else {
+        // Configure real camera parameters
+        RodCameraParameters params;
+        camera_get_default_parameters(&params);
+        // Use defaults for now, can be customized here
+        camera_interface_set_parameters(ctx->camera, &params);
+        printf("Real camera using default parameters\n");
     }
     
     // Start camera
-    if (emulated_camera_start(ctx->camera) != 0) {
-        fprintf(stderr, "Failed to start emulated camera\n");
+    if (camera_interface_start(ctx->camera) != 0) {
+        fprintf(stderr, "Failed to start camera\n");
         return -1;
     }
-    printf("Emulated camera started with folder: %s\n", image_folder);
+    printf("Camera started successfully\n");
     
     // Initialize ArUco detector
     printf("Initializing ArUco detector...\n");
@@ -198,8 +211,8 @@ static void cleanup_app_context(AppContext* ctx) {
     
     // Cleanup camera
     if (ctx->camera) {
-        emulated_camera_stop(ctx->camera);
-        emulated_camera_cleanup(ctx->camera);
+        camera_interface_stop(ctx->camera);
+        camera_destroy(ctx->camera);
         ctx->camera = NULL;
     }
     
@@ -212,27 +225,56 @@ static void cleanup_app_context(AppContext* ctx) {
 
 /**
  * @brief Main function of the program
- * Takes a picture with the emulated camera, find the aruco markers position with rod-cv, 
+ * Takes a picture with the camera, find the aruco markers position with rod-cv, 
  * and send the position to rod-com via socket.
  */
 int main(int argc, char* argv[]) {
     AppContext ctx;
     const char* image_folder = DEFAULT_IMAGE_FOLDER;
+    CameraType camera_type = CAMERA_TYPE_EMULATED;  // Default to emulated
     
     // Parse command line arguments
-    if (argc > 1) {
-        image_folder = argv[1];
+    // Usage: rod_detection [--camera real|emulated] [image_folder]
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--camera") == 0 && i + 1 < argc) {
+            i++;
+            if (strcmp(argv[i], "real") == 0) {
+                camera_type = CAMERA_TYPE_REAL;
+            } else if (strcmp(argv[i], "emulated") == 0) {
+                camera_type = CAMERA_TYPE_EMULATED;
+            } else {
+                fprintf(stderr, "Unknown camera type: %s (use 'real' or 'emulated')\n", argv[i]);
+                return 1;
+            }
+        } else {
+            // Assume it's the image folder path
+            image_folder = argv[i];
+        }
+    }
+    
+    // Check environment variable for camera type (command-line takes precedence)
+    const char* env_camera = getenv("ROD_CAMERA_TYPE");
+    if (env_camera && argc == 1) {  // Only use env var if no command-line args
+        if (strcmp(env_camera, "real") == 0) {
+            camera_type = CAMERA_TYPE_REAL;
+        } else if (strcmp(env_camera, "emulated") == 0) {
+            camera_type = CAMERA_TYPE_EMULATED;
+        }
     }
     
     printf("=== ROD Detection - Computer Vision Thread ===\n");
-    printf("Image folder: %s\n\n", image_folder);
+    printf("Camera type: %s\n", camera_type == CAMERA_TYPE_REAL ? "Real (IMX477)" : "Emulated");
+    if (camera_type == CAMERA_TYPE_EMULATED) {
+        printf("Image folder: %s\n", image_folder);
+    }
+    printf("\n");
     
     // Setup signal handler for graceful shutdown
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     
     // Initialize application context
-    if (init_app_context(&ctx, image_folder) != 0) {
+    if (init_app_context(&ctx, camera_type, image_folder) != 0) {
         fprintf(stderr, "Failed to initialize application\n");
         cleanup_app_context(&ctx);
         return 1;
@@ -256,13 +298,13 @@ int main(int argc, char* argv[]) {
         // Try to accept a client connection if not already connected
         rod_socket_server_accept(ctx.socket_server);
         
-        // Capture image from emulated camera
+        // Capture image from camera
         uint8_t* image_buffer = NULL;
         int width, height;
         size_t size;
         
-        if (emulated_camera_take_picture(ctx.camera, &image_buffer, 
-                                         &width, &height, &size) != 0) {
+        if (camera_interface_capture_frame(ctx.camera, &image_buffer, 
+                                &width, &height, &size) != 0) {
             fprintf(stderr, "Failed to capture image\n");
             usleep(10000);  // Wait 10ms before retry
             continue;

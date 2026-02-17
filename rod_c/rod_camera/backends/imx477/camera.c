@@ -6,7 +6,7 @@
  */
 
 #include "camera.h"
-#include "libcamera_wrapper.h"
+#include "../../wrappers/libcamera_wrapper.h"
 #include <stdlib.h>
 #include <stdio.h>
 

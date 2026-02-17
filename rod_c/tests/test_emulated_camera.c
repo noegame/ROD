@@ -1,11 +1,11 @@
 /**
  * test_emulated_camera.c
  * 
- * Simple test program to demonstrate the emulated camera functionality.
+ * Simple test program to demonstrate the camera interface with emulated camera.
  * Reads images from a folder and cycles through them.
  */
 
-#include "emulated_camera.h"
+#include "camera_interface.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,34 +28,34 @@ int main(int argc, char* argv[]) {
         printf("Will resize images to: %dx%d\n", width, height);
     }
     
-    // Initialize emulated camera
-    printf("Initializing emulated camera...\n");
-    EmulatedCameraContext* camera = emulated_camera_init();
+    // Initialize emulated camera using unified interface
+    printf("Initializing emulated camera via camera interface...\n");
+    Camera* camera = camera_create(CAMERA_TYPE_EMULATED);
     if (!camera) {
-        fprintf(stderr, "Failed to initialize emulated camera\n");
+        fprintf(stderr, "Failed to initialize camera\n");
         return 1;
     }
     
     // Set folder path
-    if (emulated_camera_set_folder(camera, folder_path) != 0) {
+    if (camera_interface_set_folder(camera, folder_path) != 0) {
         fprintf(stderr, "Failed to set folder path\n");
-        emulated_camera_cleanup(camera);
+        camera_destroy(camera);
         return 1;
     }
     
     // Set size if specified
     if (width > 0 && height > 0) {
-        if (emulated_camera_set_size(camera, width, height) != 0) {
+        if (camera_interface_set_size(camera, width, height) != 0) {
             fprintf(stderr, "Failed to set camera size\n");
-            emulated_camera_cleanup(camera);
+            camera_destroy(camera);
             return 1;
         }
     }
     
     // Start camera (loads image list)
-    if (emulated_camera_start(camera) != 0) {
-        fprintf(stderr, "Failed to start emulated camera\n");
-        emulated_camera_cleanup(camera);
+    if (camera_interface_start(camera) != 0) {
+        fprintf(stderr, "Failed to start camera\n");
+        camera_destroy(camera);
         return 1;
     }
     
@@ -66,24 +66,24 @@ int main(int argc, char* argv[]) {
         int img_width, img_height;
         size_t img_size;
         
-        if (emulated_camera_take_picture(camera, &buffer, &img_width, 
-                                         &img_height, &img_size) == 0) {
-            printf("  Image %d: %dx%d, %zu bytes (RGB format)\n", 
+        if (camera_interface_capture_frame(camera, &buffer, &img_width, 
+                                 &img_height, &img_size) == 0) {
+            printf("  Image %d: %dx%d, %zu bytes (BGR format)\n", 
                    i + 1, img_width, img_height, img_size);
             
             // Calculate some statistics on the image data
             if (buffer && img_size > 0) {
-                unsigned long sum_r = 0, sum_g = 0, sum_b = 0;
+                unsigned long sum_b = 0, sum_g = 0, sum_r = 0;
                 int num_pixels = img_width * img_height;
                 
                 for (int p = 0; p < num_pixels; p++) {
-                    sum_r += buffer[p * 3 + 0];
+                    sum_b += buffer[p * 3 + 0];
                     sum_g += buffer[p * 3 + 1];
-                    sum_b += buffer[p * 3 + 2];
+                    sum_r += buffer[p * 3 + 2];
                 }
                 
-                printf("    Average RGB: (%lu, %lu, %lu)\n", 
-                       sum_r / num_pixels, sum_g / num_pixels, sum_b / num_pixels);
+                printf("    Average BGR: (%lu, %lu, %lu)\n", 
+                       sum_b / num_pixels, sum_g / num_pixels, sum_r / num_pixels);
             }
             
             // Free the buffer
@@ -94,11 +94,11 @@ int main(int argc, char* argv[]) {
     }
     
     // Stop and cleanup
-    printf("\nStopping emulated camera...\n");
-    emulated_camera_stop(camera);
+    printf("\nStopping camera...\n");
+    camera_interface_stop(camera);
     
     printf("Cleaning up...\n");
-    emulated_camera_cleanup(camera);
+    camera_destroy(camera);
     
     printf("Test completed successfully!\n");
     return 0;

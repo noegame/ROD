@@ -56,7 +56,7 @@ target_include_directories(test_emulated_camera PRIVATE
 # Real camera test (libcamera-based)
 if(LIBCAMERA_FOUND)
     add_executable(test_rod_camera
-        test_rod_camera.c
+        test_camera.c
     )
 
     target_link_libraries(test_rod_camera
