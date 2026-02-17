@@ -305,8 +305,10 @@ static int test_single_config(const TestConfig* config, int width, int height, c
     }
     
     // Warm-up: capture several frames to let camera adjust
-    printf("  Warming up (10 frames)...\n");
-    for (int i = 0; i < 10; i++) {
+    // Manual exposure modes need more warmup without AE feedback
+    int warmup_frames = (config->params.ae_enable == 0) ? 30 : 10;
+    printf("  Warming up (%d frames)...\n", warmup_frames);
+    for (int i = 0; i < warmup_frames; i++) {
         uint8_t* warmup_buffer = NULL;
         int w, h;
         size_t s;
@@ -345,6 +347,11 @@ static int test_single_config(const TestConfig* config, int width, int height, c
         avg_g = sum_g / num_pixels;
         avg_r = sum_r / num_pixels;
         printf("  Average BGR: (%lu, %lu, %lu)\n", avg_b, avg_g, avg_r);
+        
+        // Warn if image appears all black
+        if (avg_b < 5 && avg_g < 5 && avg_r < 5) {
+            fprintf(stderr, "  WARNING: Image appears completely black!\n");
+        }
     }
     
     // Validate buffer
@@ -454,6 +461,11 @@ int main(int argc, char* argv[]) {
         } else {
             fprintf(stderr, "  FAILED\n");
             failed++;
+        }
+        
+        // Delay between tests to allow camera hardware to stabilize
+        if (i < NUM_CONFIGS - 1) {
+            usleep(500000);  // 500ms delay between tests
         }
         
         printf("\n");

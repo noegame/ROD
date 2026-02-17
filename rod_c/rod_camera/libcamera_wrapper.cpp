@@ -195,11 +195,17 @@ int libcamera_start_with_params(LibCameraContext* ctx, const struct CameraParame
     if (!ctx || !ctx->camera)
         return -1;
 
-    ctx->allocator = new FrameBufferAllocator(ctx->camera);
+    // Only create allocator if it doesn't exist (prevents memory leak)
+    if (!ctx->allocator) {
+        ctx->allocator = new FrameBufferAllocator(ctx->camera);
 
-    Stream *stream = ctx->config->at(0).stream();
-    if (ctx->allocator->allocate(stream) < 0)
-        return -1;
+        Stream *stream = ctx->config->at(0).stream();
+        if (ctx->allocator->allocate(stream) < 0) {
+            delete ctx->allocator;
+            ctx->allocator = nullptr;
+            return -1;
+        }
+    }
 
     // Build control list from parameters
     ControlList controls = build_control_list(params);
@@ -215,11 +221,17 @@ int libcamera_start(LibCameraContext* ctx) {
     if (!ctx || !ctx->camera)
         return -1;
 
-    ctx->allocator = new FrameBufferAllocator(ctx->camera);
+    // Only create allocator if it doesn't exist (prevents memory leak)
+    if (!ctx->allocator) {
+        ctx->allocator = new FrameBufferAllocator(ctx->camera);
 
-    Stream *stream = ctx->config->at(0).stream();
-    if (ctx->allocator->allocate(stream) < 0)
-        return -1;
+        Stream *stream = ctx->config->at(0).stream();
+        if (ctx->allocator->allocate(stream) < 0) {
+            delete ctx->allocator;
+            ctx->allocator = nullptr;
+            return -1;
+        }
+    }
 
     // Configure camera controls (matching Python picamera2 settings)
     ControlList controls;
@@ -244,7 +256,16 @@ int libcamera_stop(LibCameraContext* ctx) {
     if (!ctx || !ctx->camera)
         return -1;
 
-    return ctx->camera->stop();
+    // Stop camera
+    int ret = ctx->camera->stop();
+    
+    // Free allocated buffers and delete allocator
+    if (ctx->allocator) {
+        delete ctx->allocator;
+        ctx->allocator = nullptr;
+    }
+    
+    return ret;
 }
 
 /**
