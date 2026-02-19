@@ -65,6 +65,42 @@ void rod_viz_annotate_with_centers(ImageHandle* image, MarkerData* markers, int 
     }
 }
 
+void rod_viz_annotate_with_colored_quadrilaterals(ImageHandle* image, DetectionResult* detection) {
+    if (!image || !detection) {
+        return;
+    }
+    
+    // Define colors (BGR format)
+    Color blue = {255, 0, 0};    // Blue for ID 36 and 47
+    Color black = {0, 0, 0};     // Black for ID 41
+    Color green = {0, 255, 0};   // Green for ID 20-23
+    
+    int thickness = 3;
+    
+    for (int i = 0; i < detection->count; i++) {
+        DetectedMarker* marker = &detection->markers[i];
+        int id = marker->id;
+        
+        // Select color based on marker ID
+        Color* color = NULL;
+        if (id == 36 || id == 47) {
+            // Blue box (36) and Yellow box (47) get blue outline
+            color = &blue;
+        } else if (id == 41) {
+            // Empty box gets black outline
+            color = &black;
+        } else if (id >= 20 && id <= 23) {
+            // Fixed field markers get green outline
+            color = &green;
+        }
+        
+        // Draw quadrilateral if color was selected
+        if (color) {
+            draw_polyline(image, marker->corners, *color, thickness);
+        }
+    }
+}
+
 void rod_viz_annotate_with_counter(ImageHandle* image, MarkerCounts counts) {
     Color black = {0, 0, 0};
     Color green = {0, 255, 0};

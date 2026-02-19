@@ -218,6 +218,14 @@ int main(int argc, char** argv) {
     // Release resized image as we need to work with original size
     release_image(resized);
     
+    // Scale corner coordinates back to original size in DetectionResult
+    for (int i = 0; i < result_raw->count; i++) {
+        for (int j = 0; j < 4; j++) {
+            result_raw->markers[i].corners[j][0] /= scale;
+            result_raw->markers[i].corners[j][1] /= scale;
+        }
+    }
+    
     // Reload original image for annotation
     image = load_image(input_path);
     if (image == NULL) {
@@ -246,10 +254,11 @@ int main(int argc, char** argv) {
     MarkerCounts counts = count_markers_by_category(markers_scaled, valid_count);
     
     if (valid_count > 0) {
+        rod_viz_annotate_with_colored_quadrilaterals(image, result_raw);
         rod_viz_annotate_with_counter(image, counts);
         rod_viz_annotate_with_ids(image, markers_scaled, valid_count);
         rod_viz_annotate_with_centers(image, markers_scaled, valid_count);
-        printf("      Annotations added: categorized counts, IDs, centers\n");
+        printf("      Annotations added: colored quadrilaterals, categorized counts, IDs, centers\n");
     } else {
         rod_viz_annotate_with_counter(image, counts);  // Still show counts (all zeros)
         printf("      No markers to annotate\n");

@@ -46,6 +46,18 @@ void rod_viz_annotate_with_ids(ImageHandle* image, MarkerData* markers, int coun
 void rod_viz_annotate_with_centers(ImageHandle* image, MarkerData* markers, int count);
 
 /**
+ * @brief Annotate image with colored quadrilaterals based on marker ID
+ * @param image Image handle (will be modified in place)
+ * @param detection Detection result containing marker corners
+ * 
+ * Draws colored quadrilaterals around markers:
+ * - Blue: ID 36 (blue box), ID 47 (yellow box)
+ * - Black: ID 41 (empty box)
+ * - Green: ID 20-23 (fixed field markers)
+ */
+void rod_viz_annotate_with_colored_quadrilaterals(ImageHandle* image, DetectionResult* detection);
+
+/**
  * @brief Annotate image with categorized marker counts
  * @param image Image handle (will be modified in place)
  * @param counts Marker counts by category

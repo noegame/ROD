@@ -563,6 +563,25 @@ void put_text(ImageHandle* image, const char* text, int x, int y,
                 cv::FONT_HERSHEY_SIMPLEX, font_scale, cv_color, thickness);
 }
 
+void draw_polyline(ImageHandle* image, float corners[4][2], Color color, int thickness) {
+    if (image == nullptr || corners == nullptr) return;
+    
+    cv::Mat* img = reinterpret_cast<cv::Mat*>(image);
+    cv::Scalar cv_color(color.b, color.g, color.r);
+    
+    // Convert corners to cv::Point format
+    std::vector<cv::Point> points;
+    for (int i = 0; i < 4; i++) {
+        points.push_back(cv::Point(static_cast<int>(corners[i][0]), 
+                                   static_cast<int>(corners[i][1])));
+    }
+    
+    // Draw lines between consecutive corners
+    for (int i = 0; i < 4; i++) {
+        cv::line(*img, points[i], points[(i + 1) % 4], cv_color, thickness);
+    }
+}
+
 ImageHandle* fill_poly(ImageHandle* image, float* points, int num_points, Color color) {
     if (image == nullptr || points == nullptr) return nullptr;
     

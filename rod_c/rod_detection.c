@@ -481,6 +481,7 @@ int main(int argc, char* argv[]) {
                             
                             if (annotated) {
                                 MarkerCounts marker_counts = count_markers_by_category(markers, valid_count);
+                                rod_viz_annotate_with_colored_quadrilaterals(annotated, detection);
                                 rod_viz_annotate_with_counter(annotated, marker_counts);
                                 rod_viz_annotate_with_ids(annotated, markers, valid_count);
                                 rod_viz_annotate_with_centers(annotated, markers, valid_count);

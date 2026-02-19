@@ -160,6 +160,10 @@ typedef struct {
 void put_text(ImageHandle* image, const char* text, int x, int y, 
               double font_scale, Color color, int thickness);
 
+// Draw polyline (quadrilateral outline) on image
+// Points should be an array of 4 corner points [x,y]
+void draw_polyline(ImageHandle* image, float corners[4][2], Color color, int thickness);
+
 // Fill polygon on image (for mask creation)
 ImageHandle* fill_poly(ImageHandle* image, float* points, int num_points, Color color);
 
