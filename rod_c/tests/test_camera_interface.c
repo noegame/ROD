@@ -20,6 +20,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <sys/stat.h>
+
+// ANSI color codes
+#define COLOR_RED "\033[1;31m"
+#define COLOR_GREEN "\033[1;32m"
+#define COLOR_RESET "\033[0m"
+
+// Global test folder path (set from command line)
+static const char* g_test_folder = NULL;
 
 // Test case counter
 static int test_passed = 0;
@@ -88,7 +97,7 @@ int test_basic_capture() {
     TEST_ASSERT(camera != NULL, "camera_create() failed");
     
     // Set folder for emulated camera
-    const char* test_folder = "pictures/camera/2026-01-16-playground-ready";
+    const char* test_folder = g_test_folder;
     int folder_result = camera_interface_set_folder(camera, test_folder);
     TEST_ASSERT(folder_result == 0, "set_folder must succeed");
     
@@ -130,7 +139,7 @@ int test_multiple_captures() {
     Camera* camera = camera_create(CAMERA_TYPE_EMULATED);
     TEST_ASSERT(camera != NULL, "camera_create() failed");
     
-    camera_interface_set_folder(camera, "pictures/camera/2026-01-16-playground-ready");
+    camera_interface_set_folder(camera, g_test_folder);
     camera_interface_set_size(camera, 320, 240);
     camera_interface_start(camera);
     
@@ -159,7 +168,7 @@ int test_restart_cycle() {
     Camera* camera = camera_create(CAMERA_TYPE_EMULATED);
     TEST_ASSERT(camera != NULL, "camera_create() failed");
     
-    camera_interface_set_folder(camera, "pictures/camera/2026-01-16-playground-ready");
+    camera_interface_set_folder(camera, g_test_folder);
     camera_interface_set_size(camera, 640, 480);
     
     // First cycle
@@ -245,24 +254,42 @@ static const TestCase TESTS[] = {
 #define NUM_TESTS (sizeof(TESTS) / sizeof(TestCase))
 
 int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <test_folder>\n", argv[0]);
+        fprintf(stderr, "Example: %s pictures/camera/2026-01-16-playground-ready\n", argv[0]);
+        return 1;
+    }
+    
+    g_test_folder = argv[1];
+    
+    // Verify test folder exists
+    struct stat st;
+    if (stat(g_test_folder, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        fprintf(stderr, "Error: Test folder does not exist or is not a directory: %s\n", g_test_folder);
+        return 1;
+    }
+    
     printf("========================================\n");
     printf("Camera Interface Conformance Test\n");
     printf("========================================\n");
     printf("Testing: EMULATED CAMERA implementation\n");
-    printf("Number of tests: %d\n", NUM_TESTS);
+    printf("Test folder: %s\n", g_test_folder);
+    printf("Number of tests: %zu\n", NUM_TESTS);
     printf("========================================\n\n");
     
     for (size_t i = 0; i < NUM_TESTS; i++) {
-        printf("[%zu/%d] %s... ", i + 1, NUM_TESTS, TESTS[i].name);
+        printf("[%zu/%zu] %s... ", i + 1, NUM_TESTS, TESTS[i].name);
         fflush(stdout);
         
         if (TESTS[i].func() == 0) {
-            printf("PASS\n");
+            printf(COLOR_GREEN "PASS" COLOR_RESET "\n");
             test_passed++;
         } else {
-            printf("FAIL\n");
+            printf(COLOR_RED "FAIL" COLOR_RESET "\n");
             test_failed++;
         }
+        printf("\n");  // Extra newline for spacing
     }
     
     printf("\n========================================\n");

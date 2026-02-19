@@ -20,6 +20,11 @@
 #include <string.h>
 #include <math.h>
 
+// ANSI color codes
+#define COLOR_RED "\033[1;31m"
+#define COLOR_GREEN "\033[1;32m"
+#define COLOR_RESET "\033[0m"
+
 // Test case counter
 static int test_passed = 0;
 static int test_failed = 0;
@@ -302,25 +307,29 @@ static const TestCase TESTS[] = {
 #define NUM_TESTS (sizeof(TESTS) / sizeof(TestCase))
 
 int main(int argc, char* argv[]) {
+    (void)argc;  // Unused parameter
+    (void)argv;  // Unused parameter
+    
     printf("========================================\n");
     printf("ArUco Detection Dataset Test\n");
     printf("========================================\n");
     printf("Testing: Detection accuracy and pipeline\n");
-    printf("Number of tests: %d\n", NUM_TESTS);
+    printf("Number of tests: %zu\n", NUM_TESTS);
     printf("Dataset images: %zu\n", NUM_DATASET_TESTS);
     printf("========================================\n\n");
     
     for (size_t i = 0; i < NUM_TESTS; i++) {
-        printf("[%zu/%d] %s...", i + 1, NUM_TESTS, TESTS[i].name);
+        printf("[%zu/%zu] %s...", i + 1, NUM_TESTS, TESTS[i].name);
         fflush(stdout);
         
         if (TESTS[i].func() == 0) {
-            printf(" PASS\n");
+            printf(" " COLOR_GREEN "PASS" COLOR_RESET "\n");
             test_passed++;
         } else {
-            printf(" FAIL\n");
+            printf(" " COLOR_RED "FAIL" COLOR_RESET "\n");
             test_failed++;
         }
+        printf("\n");  // Extra newline for spacing
     }
     
     printf("\n========================================\n");
