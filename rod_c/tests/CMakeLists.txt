@@ -81,24 +81,6 @@ target_include_directories(test_emulated_camera_impl PRIVATE
 )
 
 # ========================================
-# 5. Emulated Camera Basic Test (Legacy)
-# ========================================
-# Simple test for emulated camera (kept for backwards compatibility)
-add_executable(test_emulated_camera
-    test_emulated_camera.c
-)
-
-target_link_libraries(test_emulated_camera
-    rod_camera
-    opencv_wrapper
-)
-
-target_include_directories(test_emulated_camera PRIVATE
-    ${CMAKE_SOURCE_DIR}/rod_camera
-    ${CMAKE_SOURCE_DIR}/rod_cv
-)
-
-# ========================================
 # 6. Camera Parameters Test (Hardware)
 # ========================================
 # Tests: libcamera parameter tuning (REAL HARDWARE ONLY)
