@@ -234,7 +234,7 @@ static void cleanup_app_context(AppContext* ctx) {
 int main(int argc, char* argv[]) {
     AppContext ctx;
     const char* image_folder = DEFAULT_IMAGE_FOLDER;
-    CameraType camera_type = CAMERA_TYPE_EMULATED;  // Default to emulated
+    CameraType camera_type = CAMERA_TYPE_IMX477;  // Default to real camera
     
     // Parse command line arguments
     // Usage: rod_detection [--camera real|emulated] [image_folder]
