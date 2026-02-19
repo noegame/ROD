@@ -499,13 +499,16 @@ Point2f* fisheye_undistort_points(Point2f* points, int num_points,
         return nullptr;
     }
     
-    // Convert input points to cv::Mat
+    // Convert input points to cv::Mat in CV_32FC2 format (required by fisheye::undistortPoints)
     std::vector<cv::Point2f> input_points;
     for (int i = 0; i < num_points; i++) {
         input_points.push_back(cv::Point2f(points[i].x, points[i].y));
     }
-    cv::Mat points_mat(input_points);
-    points_mat = points_mat.reshape(1, num_points);  // Reshape to Nx2
+    cv::Mat points_mat(input_points);  // This creates a 1xN CV_32FC2 matrix
+    // Ensure it's in the right format (Nx1 or 1xN with 2 channels)
+    if (points_mat.channels() != 2) {
+        points_mat = points_mat.reshape(2);  // Ensure 2 channels
+    }
     
     // Create camera matrix (3x3)
     cv::Mat K = cv::Mat(3, 3, CV_32F, camera_matrix).clone();
@@ -527,10 +530,29 @@ Point2f* fisheye_undistort_points(Point2f* points, int num_points,
     cv::fisheye::undistortPoints(points_mat, undistorted, K, D, cv::noArray(), P);
     
     // Convert output to Point2f array
+    // The undistorted matrix is in CV_64FC2 format (or CV_32FC2)
     Point2f* result = new Point2f[num_points];
-    for (int i = 0; i < num_points; i++) {
-        result[i].x = undistorted.at<float>(i, 0);
-        result[i].y = undistorted.at<float>(i, 1);
+    
+    if (undistorted.type() == CV_64FC2) {
+        // 64-bit double, 2 channels
+        for (int i = 0; i < num_points; i++) {
+            cv::Point2d pt = undistorted.at<cv::Point2d>(i);
+            result[i].x = static_cast<float>(pt.x);
+            result[i].y = static_cast<float>(pt.y);
+        }
+    } else if (undistorted.type() == CV_32FC2) {
+        // 32-bit float, 2 channels
+        for (int i = 0; i < num_points; i++) {
+            cv::Point2f pt = undistorted.at<cv::Point2f>(i);
+            result[i].x = pt.x;
+            result[i].y = pt.y;
+        }
+    } else {
+        // Fallback: try as Nx2 matrix
+        for (int i = 0; i < num_points; i++) {
+            result[i].x = undistorted.at<float>(i, 0);
+            result[i].y = undistorted.at<float>(i, 1);
+        }
     }
     
     return result;
