@@ -106,7 +106,7 @@ static int init_app_context(AppContext* ctx, CameraType camera_type, const char*
     
     // Initialize camera based on type
     printf("Initializing %s camera...\n", 
-           camera_type == CAMERA_TYPE_REAL ? "real" : "emulated");
+           camera_type == CAMERA_TYPE_IMX477 ? "real" : "emulated");
     ctx->camera = camera_create(camera_type);
     if (!ctx->camera) {
         fprintf(stderr, "Failed to initialize camera\n");
@@ -239,7 +239,7 @@ int main(int argc, char* argv[]) {
         if (strcmp(argv[i], "--camera") == 0 && i + 1 < argc) {
             i++;
             if (strcmp(argv[i], "real") == 0) {
-                camera_type = CAMERA_TYPE_REAL;
+                camera_type = CAMERA_TYPE_IMX477;
             } else if (strcmp(argv[i], "emulated") == 0) {
                 camera_type = CAMERA_TYPE_EMULATED;
             } else {
@@ -256,14 +256,14 @@ int main(int argc, char* argv[]) {
     const char* env_camera = getenv("ROD_CAMERA_TYPE");
     if (env_camera && argc == 1) {  // Only use env var if no command-line args
         if (strcmp(env_camera, "real") == 0) {
-            camera_type = CAMERA_TYPE_REAL;
+            camera_type = CAMERA_TYPE_IMX477;
         } else if (strcmp(env_camera, "emulated") == 0) {
             camera_type = CAMERA_TYPE_EMULATED;
         }
     }
     
     printf("=== ROD Detection - Computer Vision Thread ===\n");
-    printf("Camera type: %s\n", camera_type == CAMERA_TYPE_REAL ? "Real (IMX477)" : "Emulated");
+    printf("Camera type: %s\n", camera_type == CAMERA_TYPE_IMX477 ? "Real (IMX477)" : "Emulated");
     if (camera_type == CAMERA_TYPE_EMULATED) {
         printf("Image folder: %s\n", image_folder);
     }

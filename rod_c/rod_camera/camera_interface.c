@@ -26,7 +26,7 @@ Camera* camera_create(CameraType type) {
     cam->height = 480;
     
     // Initialize backend
-    if (type == CAMERA_TYPE_REAL) {
+    if (type == CAMERA_TYPE_IMX477) {
         CameraContext* ctx = camera_init();
         if (!ctx) {
             fprintf(stderr, "Failed to initialize real camera\n");
@@ -59,7 +59,7 @@ int camera_interface_set_size(Camera* camera, int width, int height) {
     camera->width = width;
     camera->height = height;
     
-    if (camera->type == CAMERA_TYPE_REAL) {
+    if (camera->type == CAMERA_TYPE_IMX477) {
         CameraContext* ctx = (CameraContext*)camera->backend_context;
         return camera_set_size(ctx, width, height);
     } else if (camera->type == CAMERA_TYPE_EMULATED) {
@@ -89,7 +89,7 @@ int camera_interface_set_parameters(Camera* camera, const RodCameraParameters* p
         return -1;
     }
     
-    if (camera->type == CAMERA_TYPE_REAL) {
+    if (camera->type == CAMERA_TYPE_IMX477) {
         CameraContext* ctx = (CameraContext*)camera->backend_context;
         
         // Convert RodCameraParameters to backend CameraParameters
@@ -119,7 +119,7 @@ int camera_interface_start(Camera* camera) {
         return -1;
     }
     
-    if (camera->type == CAMERA_TYPE_REAL) {
+    if (camera->type == CAMERA_TYPE_IMX477) {
         CameraContext* ctx = (CameraContext*)camera->backend_context;
         return camera_start(ctx);
     } else if (camera->type == CAMERA_TYPE_EMULATED) {
@@ -138,7 +138,7 @@ int camera_interface_capture_frame(Camera* camera, uint8_t** out_buffer,
     
     int result = -1;
     
-    if (camera->type == CAMERA_TYPE_REAL) {
+    if (camera->type == CAMERA_TYPE_IMX477) {
         CameraContext* ctx = (CameraContext*)camera->backend_context;
         result = camera_take_picture(ctx, out_buffer, out_width, out_height, out_size);
     } else if (camera->type == CAMERA_TYPE_EMULATED) {
@@ -174,7 +174,7 @@ int camera_interface_stop(Camera* camera) {
         return -1;
     }
     
-    if (camera->type == CAMERA_TYPE_REAL) {
+    if (camera->type == CAMERA_TYPE_IMX477) {
         CameraContext* ctx = (CameraContext*)camera->backend_context;
         camera_stop(ctx);
     } else if (camera->type == CAMERA_TYPE_EMULATED) {
@@ -190,7 +190,7 @@ void camera_destroy(Camera* camera) {
         return;
     }
     
-    if (camera->type == CAMERA_TYPE_REAL) {
+    if (camera->type == CAMERA_TYPE_IMX477) {
         CameraContext* ctx = (CameraContext*)camera->backend_context;
         camera_cleanup(ctx);
     } else if (camera->type == CAMERA_TYPE_EMULATED) {

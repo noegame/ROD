@@ -24,7 +24,7 @@
 
 // Camera types
 typedef enum {
-    CAMERA_TYPE_REAL,      // Hardware camera (IMX477 via libcamera)
+    CAMERA_TYPE_IMX477,      // Hardware camera (IMX477 via libcamera)
     CAMERA_TYPE_EMULATED   // Emulated camera (reads from image folder)
 } CameraType;
 
