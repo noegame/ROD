@@ -190,6 +190,26 @@ static const TestConfig TEST_CONFIGS[] = {
             .frame_duration_min = -1,
             .frame_duration_max = -1
         }
+    },
+    
+    // Match configuration - ArUco optimized for full resolution (4056x3040)
+    {
+        .name = "match",
+        .category = "optimized",
+        .params = {
+            .ae_enable = 1,  // Auto-exposure for adaptability
+            .exposure_time = -1,
+            .analogue_gain = -1,
+            .noise_reduction_mode = 2,  // HighQuality
+            .sharpness = 4.0,   // Moderate sharpness boost
+            .contrast = 1.5,    // Slight contrast boost for black/white markers
+            .brightness = 0.0,
+            .saturation = -1,
+            .awb_enable = 1,
+            .colour_temperature = -1,
+            .frame_duration_min = -1,
+            .frame_duration_max = -1
+        }
     }
 };
 
