@@ -8,8 +8,13 @@ from datetime import datetime
 import logging
 import sys
 
-from vision_python.config import config
-from vision_python.src.camera.camera_factory import get_camera
+from rod_python.src.config import config
+from rod_python.src.camera.camera_factory import get_camera
+
+# ANSI color codes
+COLOR_GREEN = '\033[0;32m'
+COLOR_RED = '\033[0;31m'
+COLOR_RESET = '\033[0m'
 
 
 def setup_logging():
@@ -43,7 +48,7 @@ def main():
             h=image_height,
             camera=camera,
         )
-        logger.info("✓ Caméra initialisée en mode STILL (haute qualité)")
+        logger.info(f"{COLOR_GREEN}Camera initialized in STILL mode (high quality){COLOR_RESET}")
 
         logger.info("=" * 60)
         logger.info("Appuyez sur [Entrée] pour capturer une image")
@@ -78,10 +83,10 @@ def main():
                     [cv2.IMWRITE_JPEG_QUALITY, 100],
                 )
 
-                logger.info(f"✓ Image capturée : {filename}")
+                logger.info(f"{COLOR_GREEN}Image captured: {filename}{COLOR_RESET}")
 
             except Exception as e:
-                logger.error(f"✗ Erreur lors de la capture : {e}")
+                logger.error(f"{COLOR_RED}Capture error: {e}{COLOR_RESET}")
 
     except KeyboardInterrupt:
         logger.info("\nArrêt du script par l'utilisateur.")

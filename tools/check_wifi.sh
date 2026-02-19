@@ -2,6 +2,11 @@
 
 # Script to show all registered WiFi networks with known passwords
 
+# Color codes
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
 echo "=== Registered WiFi Networks ==="
 echo ""
 
@@ -24,7 +29,7 @@ if [ -d "/etc/NetworkManager/system-connections" ]; then
                 has_psk=$(grep -c "^psk=" "$file")
                 
                 if [ "$has_psk" -gt 0 ]; then
-                    echo "✓ $ssid"
+                    echo -e "${GREEN}[OK]${NC} $ssid"
                     found_any=1
                 fi
             fi
@@ -32,10 +37,10 @@ if [ -d "/etc/NetworkManager/system-connections" ]; then
     done
     
     if [ "$found_any" -eq 0 ]; then
-        echo "No WiFi networks with passwords found."
+        echo -e "${RED}[FAIL]${NC} No WiFi networks with passwords found."
     fi
 else
-    echo "Error: NetworkManager system connections directory not found."
+    echo -e "${RED}[FAIL]${NC} NetworkManager system connections directory not found."
     echo "Try using: nmcli device wifi list"
     exit 1
 fi

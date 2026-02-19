@@ -20,7 +20,7 @@ import sys
 import cv2
 import numpy as np
 from pathlib import Path
-from vision_python.config import config
+from rod_python.src.config import config
 
 img_input_dir = config.get_pictures_directory() / "calibration" / "2026-01-14"
 img_output_dir = config.get_debug_directory() / "calibration"

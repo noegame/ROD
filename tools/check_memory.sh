@@ -13,19 +13,19 @@ print_info() {
 }
 
 print_success() {
-    echo -e "${GREEN}[✅]${NC} $1"
+    echo -e "${GREEN}[OK]${NC} $1"
 }
 
 print_error() {
-    echo -e "${RED}[❌]${NC} $1"
+    echo -e "${RED}[FAIL]${NC} $1"
 }
 
 print_warning() {
-    echo -e "${YELLOW}[⚠️]${NC} $1"
+    echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
 echo "$(printf '=%.0s' {1..60})"
-echo "🧠 Vérification Mémoire Raspberry Pi"
+echo "Raspberry Pi Memory Check"
 echo "$(printf '=%.0s' {1..60})"
 
 # Check total and free memory
