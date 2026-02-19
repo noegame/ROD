@@ -444,7 +444,7 @@ int main(int argc, char* argv[]) {
     printf("========================================\n");
     printf("Resolution: %dx%d\n", width, height);
     printf("Output directory: %s\n", output_dir);
-    printf("Number of configurations: %d\n", NUM_CONFIGS);
+    printf("Number of configurations: %zu\n", NUM_CONFIGS);
     printf("========================================\n\n");
     
     // Create base output directory
@@ -454,8 +454,8 @@ int main(int argc, char* argv[]) {
     int passed = 0;
     int failed = 0;
     
-    for (int i = 0; i < NUM_CONFIGS; i++) {
-        printf("[%d/%d] Testing: %s (category: %s)\n", 
+    for (size_t i = 0; i < NUM_CONFIGS; i++) {
+        printf("[%zu/%zu] Testing: %s (category: %s)\n", 
                i + 1, NUM_CONFIGS, 
                TEST_CONFIGS[i].name, 
                TEST_CONFIGS[i].category);
@@ -479,7 +479,7 @@ int main(int argc, char* argv[]) {
     printf("========================================\n");
     printf("Test Summary\n");
     printf("========================================\n");
-    printf("Total:  %d\n", NUM_CONFIGS);
+    printf("Total:  %zu\n", NUM_CONFIGS);
     printf("Passed: %d\n", passed);
     printf("Failed: %d\n", failed);
     printf("========================================\n");

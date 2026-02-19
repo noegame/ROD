@@ -18,6 +18,7 @@
 #include <assert.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <unistd.h>
 
 // Test case counter
 static int test_passed = 0;
@@ -305,15 +306,18 @@ static const TestCase TESTS[] = {
 #define NUM_TESTS (sizeof(TESTS) / sizeof(TestCase))
 
 int main(int argc, char* argv[]) {
+    (void)argc;  // Unused parameter
+    (void)argv;  // Unused parameter
+    
     printf("========================================\n");
     printf("Emulated Camera Implementation Test\n");
     printf("========================================\n");
     printf("Testing: emulated_camera.c behavior\n");
-    printf("Number of tests: %d\n", NUM_TESTS);
+    printf("Number of tests: %zu\n", NUM_TESTS);
     printf("========================================\n\n");
     
     for (size_t i = 0; i < NUM_TESTS; i++) {
-        printf("[%zu/%d] %s... ", i + 1, NUM_TESTS, TESTS[i].name);
+        printf("[%zu/%zu] %s... ", i + 1, NUM_TESTS, TESTS[i].name);
         fflush(stdout);
         
         if (TESTS[i].func() == 0) {
