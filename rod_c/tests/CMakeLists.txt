@@ -131,7 +131,6 @@ endif()
 # ========================================
 install(TARGETS 
     test_aruco_detection
-    test_detection_dataset
     test_geometric_accuracy
     test_camera_interface
     test_emulated_camera_impl
