@@ -35,6 +35,18 @@ if [ ! -f "$SCRIPT_DIR/../build/rod_communication" ]; then
     exit 1
 fi
 
+# Create required directories
+echo "Creating application directories..."
+mkdir -p /var/roboteseo/pictures
+mkdir -p /var/roboteseo/pictures/debug
+mkdir -p /var/roboteseo/pictures/camera_tests
+
+# Set permissions (allow current user and service to write)
+chown -R $SUDO_USER:$SUDO_USER /var/roboteseo
+chmod -R 755 /var/roboteseo
+
+echo -e "${GREEN}✓${NC} Directories created in /var/roboteseo/"
+
 # Copy service files
 echo "Installing service files..."
 cp "$SCRIPT_DIR/rod-detection.service" /etc/systemd/system/

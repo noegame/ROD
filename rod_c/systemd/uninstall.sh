@@ -42,6 +42,17 @@ echo -e "${GREEN}✓${NC} Service files removed"
 # Clean up socket file
 rm -f /tmp/rod_detection.sock
 
+# Ask about data directories
+echo ""
+read -p "Remove application directories (/var/roboteseo/pictures)? [y/N] " -n 1 -r
+echo ""
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    rm -rf /var/roboteseo
+    echo -e "${GREEN}✓${NC} Application directories removed"
+else
+    echo -e "${YELLOW}→${NC} Application directories preserved"
+fi
+
 # Reload systemd
 echo "Reloading systemd daemon..."
 systemctl daemon-reload
