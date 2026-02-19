@@ -13,6 +13,7 @@
  */
 
 #define _POSIX_C_SOURCE 199309L  // Required for clock_gettime and CLOCK_MONOTONIC
+#define _DEFAULT_SOURCE          // Required for usleep
 
 /* ******************************************************* Includes ****************************************************** */
 
@@ -446,7 +447,6 @@ int main(int argc, char* argv[]) {
             int valid_count = filter_valid_markers(detection, markers, 100);
             
             // Send detection results
-            double t_send_start = get_time_ms();
             if (valid_count > 0) {
                 rod_socket_server_send_detections(ctx.socket_server, markers, valid_count);
             }
