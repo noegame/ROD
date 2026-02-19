@@ -1,16 +1,18 @@
 # folder exclusions
-pictures/*
 .venv/
 .env/
 .vscode/
+.github/
 bin/
 build/
-calibrations/*
 
 # file exclusions
+*.code-workspace
+*.code-snippets
 *.log
-*code-workspace
+*.png
+*jpg
 *__pycache__/
-rod_c/docs/snippets/c.code-snippets
-.github/copilot-instructions.md
+
+# specific files exclusions
 TO DO.txt
