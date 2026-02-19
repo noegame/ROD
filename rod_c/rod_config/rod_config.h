@@ -25,7 +25,7 @@
 #define ROD_MAX_DETECTION_SIZE 1024
 
 // Debug configuration
-#define ROD_PICTURES_BASE_FOLDER "/var/roboteseo/pictures"
+#define ROD_PICTURES_BASE_FOLDER "/var/roboteseo/pictures/camera"
 #define ROD_DEBUG_BASE_FOLDER "/var/roboteseo/pictures/debug"
 #define ROD_SAVE_DEBUG_IMAGE_INTERVAL 1  // Save every N frames
 
