@@ -117,8 +117,22 @@ int libcamera_configure(LibCameraContext* ctx, int width, int height) {
     streamConfig.size.height = height;
     streamConfig.pixelFormat = PixelFormat::fromString("BGR888");
 
-    if (ctx->config->validate() == CameraConfiguration::Invalid)
+    // Validate configuration (may modify format/size)
+    CameraConfiguration::Status status = ctx->config->validate();
+    if (status == CameraConfiguration::Invalid) {
+        std::cerr << "Camera configuration invalid" << std::endl;
         return -1;
+    }
+
+    // Debug: Print actual configuration after validation
+    const StreamConfiguration &cfg = ctx->config->at(0);
+    std::cout << "Camera configured: " << cfg.size.width << "x" << cfg.size.height
+              << " format=" << cfg.pixelFormat.toString()
+              << " stride=" << cfg.stride << std::endl;
+    
+    if (status == CameraConfiguration::Adjusted) {
+        std::cout << "Note: Configuration was adjusted by libcamera" << std::endl;
+    }
 
     if (ctx->camera->configure(ctx->config.get()) < 0)
         return -1;
@@ -344,10 +358,11 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
         return -1;
     }
 
-    // Get stream configuration for dimensions
+    // Get stream configuration for dimensions and stride
     const StreamConfiguration &cfg = ctx->config->at(0);
     *out_width = cfg.size.width;
     *out_height = cfg.size.height;
+    unsigned int stride = cfg.stride;
 
     // Map buffer and copy data to caller-owned buffer
     const FrameBuffer::Plane &plane = buffer->planes().front();
@@ -357,22 +372,29 @@ int libcamera_capture_frame(LibCameraContext* ctx, uint8_t** out_buffer,
         return -1;
     }
 
-    // Allocate buffer for caller (BGR888: 3 bytes per pixel)
+    // Allocate buffer for caller (BGR888: 3 bytes per pixel, no padding)
     size_t data_size = (*out_width) * (*out_height) * 3;
     *out_buffer = (uint8_t*)malloc(data_size);
     if (!(*out_buffer)) {
         munmap(mem, plane.length);
         return -1;
     }
-    
-    // Debug: Check if buffer size matches expectation
-    if (plane.length < data_size) {
-        std::cerr << "Warning: Buffer size mismatch - expected " << data_size 
-                  << " bytes but got " << plane.length << " bytes" << std::endl;
-    }
 
-    // Copy data from mmap'd buffer
-    memcpy(*out_buffer, mem, data_size);
+    // Copy data handling stride (row padding)
+    uint8_t* src = (uint8_t*)mem;
+    uint8_t* dst = *out_buffer;
+    unsigned int row_bytes = (*out_width) * 3;  // BGR888 = 3 bytes per pixel
+    
+    if (stride == row_bytes) {
+        // No padding - simple copy
+        memcpy(dst, src, data_size);
+    } else {
+        // Stride includes padding - copy row by row
+        for (int y = 0; y < *out_height; y++) {
+            memcpy(dst + y * row_bytes, src + y * stride, row_bytes);
+        }
+    }
+    
     *out_size = data_size;
 
     // Unmap the buffer
