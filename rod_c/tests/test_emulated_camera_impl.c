@@ -20,6 +20,14 @@
 #include <dirent.h>
 #include <unistd.h>
 
+// ANSI color codes
+#define COLOR_RED "\033[1;31m"
+#define COLOR_GREEN "\033[1;32m"
+#define COLOR_RESET "\033[0m"
+
+// Global test folder path (set from command line)
+static const char* g_test_folder = NULL;
+
 // Test case counter
 static int test_passed = 0;
 static int test_failed = 0;
@@ -65,7 +73,7 @@ int count_images_in_folder(const char* folder_path) {
  * Test 1: Cycle through all images in folder
  */
 int test_cycle_through_folder() {
-    const char* test_folder = "pictures/camera/2026-01-16-playground-ready";
+    const char* test_folder = g_test_folder;
     
     // Count images in folder
     int num_images = count_images_in_folder(test_folder);
@@ -141,7 +149,7 @@ int test_empty_folder() {
  * Test 3: Different image sizes in same folder
  */
 int test_mixed_dimensions() {
-    const char* test_folder = "pictures/camera/2026-01-16-playground-ready";
+    const char* test_folder = g_test_folder;
     
     Camera* camera = camera_create(CAMERA_TYPE_EMULATED);
     TEST_ASSERT(camera != NULL, "camera_create() failed");
@@ -180,7 +188,7 @@ int test_mixed_dimensions() {
  * Test 4: Changing folder mid-operation
  */
 int test_change_folder_after_start() {
-    const char* folder1 = "pictures/camera/2026-01-16-playground-ready";
+    const char* folder1 = g_test_folder;
     
     Camera* camera = camera_create(CAMERA_TYPE_EMULATED);
     TEST_ASSERT(camera != NULL, "camera_create() failed");
@@ -221,7 +229,7 @@ int test_change_folder_after_start() {
  * Test 5: No resize (keep original dimensions)
  */
 int test_no_resize() {
-    const char* test_folder = "pictures/camera/2026-01-16-playground-ready";
+    const char* test_folder = g_test_folder;
     
     Camera* camera = camera_create(CAMERA_TYPE_EMULATED);
     TEST_ASSERT(camera != NULL, "camera_create() failed");
@@ -252,7 +260,7 @@ int test_no_resize() {
  * Test 6: Verify BGR format (3 channels)
  */
 int test_bgr_format() {
-    const char* test_folder = "pictures/camera/2026-01-16-playground-ready";
+    const char* test_folder = g_test_folder;
     
     Camera* camera = camera_create(CAMERA_TYPE_EMULATED);
     TEST_ASSERT(camera != NULL, "camera_create() failed");
@@ -306,13 +314,27 @@ static const TestCase TESTS[] = {
 #define NUM_TESTS (sizeof(TESTS) / sizeof(TestCase))
 
 int main(int argc, char* argv[]) {
-    (void)argc;  // Unused parameter
-    (void)argv;  // Unused parameter
+    // Parse command line arguments
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <test_folder>\n", argv[0]);
+        fprintf(stderr, "Example: %s pictures/camera/2026-01-16-playground-ready\n", argv[0]);
+        return 1;
+    }
+    
+    g_test_folder = argv[1];
+    
+    // Verify test folder exists
+    struct stat st;
+    if (stat(g_test_folder, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        fprintf(stderr, "Error: Test folder does not exist or is not a directory: %s\n", g_test_folder);
+        return 1;
+    }
     
     printf("========================================\n");
     printf("Emulated Camera Implementation Test\n");
     printf("========================================\n");
     printf("Testing: emulated_camera.c behavior\n");
+    printf("Test folder: %s\n", g_test_folder);
     printf("Number of tests: %zu\n", NUM_TESTS);
     printf("========================================\n\n");
     
@@ -321,13 +343,13 @@ int main(int argc, char* argv[]) {
         fflush(stdout);
         
         if (TESTS[i].func() == 0) {
-            printf("PASS");
+            printf(COLOR_GREEN "PASS" COLOR_RESET);
             test_passed++;
         } else {
-            printf("FAIL");
+            printf(COLOR_RED "FAIL" COLOR_RESET);
             test_failed++;
         }
-        printf("\n");
+        printf("\n\n");  // Double newline for spacing between tests
     }
     
     printf("\n========================================\n");
