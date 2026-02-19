@@ -15,6 +15,7 @@ ExecStart=/opt/roboteseo/ROD/rod_c/build/rod_detection pictures/2026-01-16-playg
 # Restart policy
 Restart=always
 RestartSec=2
+TimeoutStopSec=3
 
 # Resource limits
 MemoryMax=512M

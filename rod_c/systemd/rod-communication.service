@@ -20,6 +20,7 @@ ExecStartPre=/bin/sleep 1
 # Restart policy
 Restart=always
 RestartSec=2
+TimeoutStopSec=3
 
 # Resource limits
 MemoryMax=256M

@@ -24,13 +24,15 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <poll.h>
 
 /* ***************************************************** Public macros *************************************************** */
 
 // Socket configuration (must match rod_detection.c)
 #define SOCKET_PATH "/tmp/rod_detection.sock"
 #define MAX_BUFFER_SIZE 4096
-#define RECONNECT_DELAY_US 1000000  // 1 second
+#define RECONNECT_DELAY_US 1000000  // 1 second in microseconds
+#define POLL_TIMEOUT_MS 100         // 100ms poll timeout for responsive shutdown
 
 /* ************************************************** Public types definition ******************************************** */
 
@@ -181,27 +183,63 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // Receive data from detection thread
-        ssize_t bytes_received = recv(ctx.socket_fd, buffer, MAX_BUFFER_SIZE - 1, 0);
+        // Use poll() to wait for data with timeout (allows responsive shutdown)
+        struct pollfd pfd;
+        pfd.fd = ctx.socket_fd;
+        pfd.events = POLLIN;
+        pfd.revents = 0;
         
-        if (bytes_received > 0) {
-            // Null-terminate received data
-            buffer[bytes_received] = '\0';
-            
-            // Process the detection data
-            process_detection_data(buffer);
-            
-        } else if (bytes_received == 0) {
-            // Connection closed by detection thread
-            printf("Detection thread closed connection, reconnecting...\n");
+        int poll_result = poll(&pfd, 1, POLL_TIMEOUT_MS);
+        
+        if (poll_result < 0) {
+            // Poll error
+            if (errno == EINTR) {
+                // Interrupted by signal, check g_running and continue
+                continue;
+            }
+            fprintf(stderr, "Poll error: %s\n", strerror(errno));
             cleanup_comm_context(&ctx);
             usleep(RECONNECT_DELAY_US);
+            continue;
+            
+        } else if (poll_result == 0) {
+            // Timeout - no data available, loop back to check g_running
+            continue;
             
         } else {
-            // Error occurred
-            fprintf(stderr, "Error receiving data: %s\n", strerror(errno));
-            cleanup_comm_context(&ctx);
-            usleep(RECONNECT_DELAY_US);
+            // Data available or connection event
+            if (pfd.revents & (POLLHUP | POLLERR | POLLNVAL)) {
+                // Connection closed or error
+                printf("Detection thread closed connection, reconnecting...\n");
+                cleanup_comm_context(&ctx);
+                usleep(RECONNECT_DELAY_US);
+                continue;
+            }
+            
+            if (pfd.revents & POLLIN) {
+                // Data available - receive it
+                ssize_t bytes_received = recv(ctx.socket_fd, buffer, MAX_BUFFER_SIZE - 1, 0);
+                
+                if (bytes_received > 0) {
+                    // Null-terminate received data
+                    buffer[bytes_received] = '\0';
+                    
+                    // Process the detection data
+                    process_detection_data(buffer);
+                    
+                } else if (bytes_received == 0) {
+                    // Connection closed by detection thread
+                    printf("Detection thread closed connection, reconnecting...\n");
+                    cleanup_comm_context(&ctx);
+                    usleep(RECONNECT_DELAY_US);
+                    
+                } else {
+                    // Error occurred
+                    fprintf(stderr, "Error receiving data: %s\n", strerror(errno));
+                    cleanup_comm_context(&ctx);
+                    usleep(RECONNECT_DELAY_US);
+                }
+            }
         }
     }
     
