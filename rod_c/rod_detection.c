@@ -133,22 +133,21 @@ static int init_app_context(AppContext* ctx, CameraType camera_type, const char*
         }
         printf("Emulated camera folder: %s\n", image_folder);
     } else {
-        // Configure real camera with IMX477 tuned parameters
-        // Based on imx477_tuned configuration from test_camera_parameters.c
-        // Optimized for auto-exposure with IMX477 tuning file settings
+        // Configure real camera with "match" parameters from test_camera_parameters.c
+        // ArUco optimized for full resolution (4056x3040)
         RodCameraParameters params;
-        params.exposure_time = -1;           // Let AE decide based on tuning file
-        params.analogue_gain = -1.0f;        // Let AE decide based on tuning file
+        params.exposure_time = -1;           // Let AE decide (auto-exposure)
+        params.analogue_gain = -1.0f;        // Let AE decide (auto-exposure)
         params.brightness = 0.0f;            // Default brightness
-        params.contrast = 1.0f;              // CE enabled with gamma curve in tuning file
-        params.saturation = 1.0f;            // Default saturation
-        params.sharpness = 1.0f;             // Default sharpen strength from imx477.json
+        params.contrast = 1.5f;              // Slight contrast boost for black/white markers
+        params.saturation = -1.0f;           // Default saturation (auto)
+        params.sharpness = 4.0f;             // Moderate sharpness boost for ArUco detection
         params.awb_enable = 1;               // Auto white balance enabled
-        params.aec_enable = 1;               // Auto-exposure enabled (uses IMX477 exposure curves)
-        params.noise_reduction_mode = 2;     // HighQuality (matches denoise settings)
+        params.aec_enable = 1;               // Auto-exposure enabled for adaptability
+        params.noise_reduction_mode = 2;     // HighQuality
         
         camera_interface_set_parameters(ctx->camera, &params);
-        printf("Real camera using IMX477 tuned parameters (auto-exposure enabled)\n");
+        printf("Real camera using 'match' parameters (4056x3040, ArUco optimized)\n");
     }
     
     // Start camera
