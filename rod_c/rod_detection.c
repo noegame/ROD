@@ -460,9 +460,9 @@ int main(int argc, char* argv[]) {
                 if (rod_config_ensure_date_folder(PICTURES_BASE_FOLDER, pictures_date_folder, sizeof(pictures_date_folder)) == 0 &&
                     rod_config_ensure_date_folder(DEBUG_BASE_FOLDER, debug_date_folder, sizeof(debug_date_folder)) == 0) {
                     
-                    // 1. Save raw camera image: /var/roboteseo/pictures/YYYY_MM_DD/YYYYMMDD_HHMMSS_MS.png
+                    // 1. Save raw camera image: /var/roboteseo/pictures/YYYY_MM_DD/YYYYMMDD_HHMMSS_MS.jpg
                     char filename_camera[512];
-                    snprintf(filename_camera, sizeof(filename_camera), "%s/%s.png", pictures_date_folder, timestamp);
+                    snprintf(filename_camera, sizeof(filename_camera), "%s/%s.jpg", pictures_date_folder, timestamp);
                     save_image(filename_camera, original_image);
                     
                     // 2. Save annotated debug image: /var/roboteseo/pictures/debug/YYYY_MM_DD/YYYYMMDD_HHMMSS_MS_debug.png
@@ -486,14 +486,14 @@ int main(int argc, char* argv[]) {
                                 rod_viz_annotate_with_centers(annotated, markers, valid_count);
                                 
                                 char filename_debug[512];
-                                snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.png", debug_date_folder, timestamp);
+                                snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.jpg", debug_date_folder, timestamp);
                                 save_image(filename_debug, annotated);
                                 release_image(annotated);
                             }
                         }
                     }
                     
-                    printf("Images saved: %s.png and %s_debug.png (markers: %d)\n", timestamp, timestamp, valid_count);
+                    printf("Images saved: %s.jpg and %s_debug.jpg (markers: %d)\n", timestamp, timestamp, valid_count);
                 }
             }
             double t_save_end = get_time_ms();
@@ -542,15 +542,15 @@ int main(int argc, char* argv[]) {
                     
                     // Save raw camera image
                     char filename_camera[512];
-                    snprintf(filename_camera, sizeof(filename_camera), "%s/%s.png", pictures_date_folder, timestamp);
+                    snprintf(filename_camera, sizeof(filename_camera), "%s/%s.jpg", pictures_date_folder, timestamp);
                     save_image(filename_camera, original_image);
                     
                     // Save debug image (no annotations, but in debug folder)
                     char filename_debug[512];
-                    snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.png", debug_date_folder, timestamp);
+                    snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.jpg", debug_date_folder, timestamp);
                     save_image(filename_debug, original_image);
                     
-                    printf("Images saved: %s.png and %s_debug.png (no markers)\n", timestamp, timestamp);
+                    printf("Images saved: %s.jpg and %s_debug.jpg (no markers)\n", timestamp, timestamp);
                 }
             }
         }
