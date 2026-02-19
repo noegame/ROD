@@ -7,12 +7,12 @@ PartOf=rod.target
 
 [Service]
 Type=simple
-User=noegame
-Group=noegame
-WorkingDirectory=/home/noegame/ROD
+User=roboteseo
+Group=roboteseo
+WorkingDirectory=/opt/roboteseo/ROD
 
 # Main communication process
-ExecStart=/home/noegame/ROD/rod_c/build/rod_communication
+ExecStart=/opt/roboteseo/ROD/rod_c/build/rod_communication
 
 # Wait for detection socket to be ready
 ExecStartPre=/bin/sleep 1

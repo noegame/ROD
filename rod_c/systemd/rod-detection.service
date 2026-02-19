@@ -5,12 +5,12 @@ PartOf=rod.target
 
 [Service]
 Type=simple
-User=noegame
-Group=noegame
-WorkingDirectory=/home/noegame/ROD
+User=roboteseo
+Group=roboteseo
+WorkingDirectory=/opt/roboteseo/ROD
 
 # Main detection process
-ExecStart=/home/noegame/ROD/rod_c/build/rod_detection pictures/2026-01-16-playground-ready
+ExecStart=/opt/roboteseo/ROD/rod_c/build/rod_detection pictures/2026-01-16-playground-ready
 
 # Restart policy
 Restart=always
