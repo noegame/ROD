@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Script simple pour capturer des images pour la calibration de la caméra.
+Simple script to capture images for camera calibration.
 
-Ce script utilise la configuration pour obtenir la résolution,
-initialise la caméra en mode still (haute qualité),
-et capture une image chaque fois que l'utilisateur appuie sur [Entrée].
+This script uses the configuration to get the resolution,
+initializes the camera in still mode (high quality),
+and captures an image each time the user presses [Enter].
 
-Les images sont sauvegardées dans 'output/calibration' avec la date et la résolution dans le nom.
+Images are saved in 'output/calibration' with the date and resolution in the filename.
 
-Appuyez sur Ctrl+C pour arrêter le script.
+Press Ctrl+C to stop the script.
 """
 
 # ---------------------------------------------------------------------------
@@ -50,13 +50,13 @@ def main():
             / f"{datetime.now().strftime('%Y%m%d')}"
         )
 
-        # Créer le répertoire de sortie s'il n'existe pas
+        # Create the output directory if it doesn't exist
         output_path.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Répertoire de sortie des images : {output_path}")
+        logger.info(f"Image output directory: {output_path}")
 
-        # Initialiser la caméra en mode still (haute qualité)
+        # Initialize the camera in still mode (high quality)
         logger.info(
-            f"Initialisation de la caméra avec une résolution de {image_width}x{image_height}..."
+            f"Initializing the camera with a resolution of {image_width}x{image_height}..."
         )
         cam = get_camera(
             w=image_width,
@@ -67,29 +67,29 @@ def main():
         logger.info(f"{COLOR_GREEN}Camera initialized in STILL mode (high quality){COLOR_RESET}")
 
         logger.info("=" * 60)
-        logger.info("Appuyez sur [Entrée] pour capturer une image")
-        logger.info("Appuyez sur Ctrl+C pour quitter")
+        logger.info("Press [Enter] to capture an image")
+        logger.info("Press Ctrl+C to quit")
         logger.info("=" * 60)
 
-        # Boucle pour attendre l'input de l'utilisateur
+        # Loop to wait for user input
         capture_count = 0
         while True:
-            input()  # Attend que l'utilisateur appuie sur Entrée
+            input()  # Wait for the user to press Enter
             capture_count += 1
-            logger.info(f"Capture #{capture_count} en cours...")
+            logger.info(f"Capture #{capture_count} in progress...")
 
             try:
-                # Créer le timestamp et le nom de fichier avec la résolution
+                # Create the timestamp and the filename with the resolution
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
                 filename = f"{timestamp}_{image_width}x{image_height}_capture.jpg"
                 filepath = output_path / filename
 
-                # Capturer l'image
+                # Capture the image
                 import cv2
 
                 image_array = cam.take_picture()
 
-                # Sauvegarder manuellement l'image
+                # Save the image manually
                 cv2.imwrite(
                     str(filepath),
                     cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR),
@@ -102,16 +102,16 @@ def main():
                 logger.error(f"{COLOR_RED}Capture error: {e}{COLOR_RESET}")
 
     except KeyboardInterrupt:
-        logger.info("\nArrêt du script par l'utilisateur.")
+        logger.info("\nScript stopped by user.")
     except Exception as e:
-        logger.error(f"Une erreur fatale est survenue : {e}")
+        logger.error(f"A fatal error occurred: {e}")
     finally:
         if cam is not None:
             try:
                 cam.close()
             except Exception as e:
-                logger.debug(f"Erreur lors de l'arrêt de la caméra : {e}")
-        logger.info("Caméra arrêtée.")
+                logger.debug(f"Error while stopping the camera: {e}")
+        logger.info("Camera stopped.")
 
 
 if __name__ == "__main__":

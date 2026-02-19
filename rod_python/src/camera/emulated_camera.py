@@ -106,13 +106,13 @@ class EmulatedCamera(Camera):
             self.image_folder = parameters["image_folder"]
             if not isinstance(self.image_folder, Path):
                 self.image_folder = Path(self.image_folder)
-            logger.info(f"Dossier d'images configuré: {self.image_folder}")
+            logger.info(f"Image folder configured: {self.image_folder}")
 
-        # Log des paramètres non reconnus
+        # Log unrecognized parameters
         known_params = {"width", "height", "image_folder"}
         unknown_params = set(parameters.keys()) - known_params
         if unknown_params:
-            logger.warning(f"Paramètres non reconnus ignorés: {unknown_params}")
+            logger.warning(f"Unrecognized parameters ignored: {unknown_params}")
 
     def take_picture(self) -> np.ndarray:
         """
@@ -122,26 +122,26 @@ class EmulatedCamera(Camera):
         """
         try:
             if not self.image_files:
-                raise Exception("Aucune image disponible dans le dossier configuré")
+                raise Exception("No images available in the configured folder")
 
             source_path = self.image_files[self.current_image_index]
-            image_array = cv2.imread(str(source_path))  # cv2 lit en BGR
+            image_array = cv2.imread(str(source_path))  # cv2 reads in BGR
 
             if image_array is None:
-                raise Exception(f"Impossible de lire l'image: {source_path}")
+                raise Exception(f"Cannot read the image: {source_path}")
 
-            # Convertir BGR en RGB pour cohérence avec les autres caméras
+            # Convert BGR to RGB for consistency with other cameras
             image_array_rgb = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
 
-            # Passer à l'image suivante (boucle circulaire)
+            # Move to next image (circular loop)
             self.current_image_index = (self.current_image_index + 1) % len(
                 self.image_files
             )
-            logger.info(f"Image 'capturée' depuis: {source_path.name}")
+            logger.info(f"Image 'captured' from: {source_path.name}")
 
             return image_array_rgb
         except Exception as e:
-            logger.error(f"Erreur lors de la capture simulée: {e}")
+            logger.error(f"Error during simulated capture: {e}")
             raise
 
     def close(self):

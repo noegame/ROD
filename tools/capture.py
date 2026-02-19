@@ -39,9 +39,9 @@ def main():
         image_width, image_height = config.get_camera_resolution()
         output_path = config.get_output_directory() / "camera"
 
-        # Initialiser la caméra en mode still (haute qualité)
+        # Initialize the camera in still mode (high quality)
         logger.info(
-            f"Initialisation de la caméra avec une résolution de {image_width}x{image_height}..."
+            f"Initializing the camera with a resolution of {image_width}x{image_height}..."
         )
         cam = get_camera(
             w=image_width,
@@ -51,31 +51,31 @@ def main():
         logger.info(f"{COLOR_GREEN}Camera initialized in STILL mode (high quality){COLOR_RESET}")
 
         logger.info("=" * 60)
-        logger.info("Appuyez sur [Entrée] pour capturer une image")
-        logger.info("Appuyez sur Ctrl+C pour quitter")
+        logger.info("Press [Enter] to capture an image")
+        logger.info("Press Ctrl+C to quit")
         logger.info("=" * 60)
 
-        # Boucle pour attendre l'input de l'utilisateur
+        # Loop to wait for user input
         capture_count = 0
         while True:
-            input()  # Attend que l'utilisateur appuie sur Entrée
+            input()  # Wait for the user to press Enter
             capture_count += 1
-            logger.info(f"Capture #{capture_count} en cours...")
+            logger.info(f"Capture #{capture_count} in progress...")
 
             try:
-                # Créer le timestamp et le nom de fichier avec la résolution
+                # Create the timestamp and the filename with the resolution
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
                 filename = (
                     f"{timestamp}_{image_width}x{image_height}_capture_debut_match.jpg"
                 )
                 filepath = output_path / filename
 
-                # Capturer l'image
+                # Capture the image
                 import cv2
 
                 image_array = cam.take_picture()
 
-                # Sauvegarder manuellement l'image
+                # Save the image manually
                 output_path.mkdir(parents=True, exist_ok=True)
                 cv2.imwrite(
                     str(filepath),
@@ -89,16 +89,16 @@ def main():
                 logger.error(f"{COLOR_RED}Capture error: {e}{COLOR_RESET}")
 
     except KeyboardInterrupt:
-        logger.info("\nArrêt du script par l'utilisateur.")
+        logger.info("\nScript stopped by user.")
     except Exception as e:
-        logger.error(f"Une erreur fatale est survenue : {e}")
+        logger.error(f"A fatal error occurred: {e}")
     finally:
         if cam is not None:
             try:
                 cam.close()
             except Exception as e:
-                logger.debug(f"Erreur lors de l'arrêt de la caméra : {e}")
-        logger.info("Caméra arrêtée.")
+                logger.debug(f"Error while stopping the camera: {e}")
+        logger.info("Camera stopped.")
 
 
 if __name__ == "__main__":

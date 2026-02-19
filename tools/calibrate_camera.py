@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
 calibrate_camera.py
-Les paramètres sont maintenant définis directement dans le code.
-- Le dossier des images est fixé à 'output/calibration'.
-- Le motif du damier est '9x6'.
-- La taille des carrés est de 0.025m.
-- Le fichier de sortie est 'camera_calibration.npz' dans le dossier 'config'.
+Parameters are now defined directly in the code.
+- The image folder is set to 'output/calibration'.
+- The checkerboard pattern is '9x6'.
+- The square size is 0.025m.
+- The output file is 'camera_calibration.npz' in the 'config' folder.
 
 Description:
-    Calibre une caméra en utilisant des images d'un damier (chessboard) avec OpenCV.
-    Détecte les coins intérieurs du damier dans les images fournies, puis calcule la matrice de la caméra et les coefficients de distorsion.
-    Sauvegarde les résultats dans un fichier .npz.
+    Calibrates a camera using checkerboard images with OpenCV.
+    Detects the inner corners of the checkerboard in the provided images, then calculates the camera matrix and distortion coefficients.
+    Saves the results to a .npz file.
 
 """
 
@@ -66,7 +66,7 @@ def calibrate_from_images(image_paths, pattern_size, square_size, debug_dir=None
             imgpoints.append(corners_refined)
             used_images.append(p)
 
-            # Sauvegarder une image de debug avec les coins détectés
+            # Save a debug image with detected corners
             if debug_dir:
                 img_with_corners = img.copy()
                 cv2.drawChessboardCorners(
@@ -139,23 +139,23 @@ def undistort_example(image_path, camera_matrix, dist_coeffs, out_path=None):
 
 
 def main():
-    # --- Paramètres de calibration ---
+    # --- Calibration parameters ---
     pattern_str = "9x6"
     square_size = 0.025
 
     cols, rows = map(int, pattern_str.split("x"))
 
-    print(f"Recherche des images de calibration dans : {img_input_dir}")
+    print(f"Searching for calibration images in: {img_input_dir}")
     image_paths = collect_image_paths(str(img_input_dir))
     if not image_paths:
-        print(f"Aucune image trouvée dans {img_input_dir}", file=sys.stderr)
+        print(f"No images found in {img_input_dir}", file=sys.stderr)
         sys.exit(1)
 
     print(
         f"Found {len(image_paths)} images, trying to detect chessboard {cols}x{rows}..."
     )
 
-    # Créer le dossier de debug avant la calibration
+    # Create the debug folder before calibration
     img_output_dir.mkdir(parents=True, exist_ok=True)
 
     result = calibrate_from_images(
@@ -170,16 +170,16 @@ def main():
     print("Distortion coefficients:\n", result["dist_coeffs"].ravel())
     print("Used images:", len(result["used_images"]))
 
-    # Créer le dossier de sortie s'il n'existe pas
+    # Create the output folder if it doesn't exist
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Créer le nom du fichier avec la résolution
+    # Create the filename with the resolution
     img_width, img_height = result["image_size"]
     base_filename = f"camera_calibration_{img_width}x{img_height}"
     output_filename = f"{base_filename}.npz"
     output_file = output_dir / output_filename
 
-    # Gérer les fichiers existants en ajoutant (2), (3), etc.
+    # Handle existing files by adding (2), (3), etc.
     counter = 2
     while output_file.exists():
         output_filename = f"{base_filename} ({counter}).npz"
@@ -196,7 +196,7 @@ def main():
         image_size=result["image_size"],
         used_images=result["used_images"],
     )
-    print(f"Calibration sauvegardée dans {output_file}")
+    print(f"Calibration saved in {output_file}")
 
     # Optional: undistort and save first used image for quick check
     try:

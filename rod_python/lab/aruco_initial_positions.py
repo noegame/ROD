@@ -56,7 +56,7 @@ def get_expected_position():
         for tag_id in possible_ids:
             if tag_id not in expected_positions:
                 expected_positions[tag_id] = []
-            # Stocker uniquement X,Y pour la recherche de proximité (Z ajouté dynamiquement)
+            # Store only X,Y for proximity search (Z added dynamically)
             expected_positions[tag_id].append((x, y, z))
 
     return expected_positions

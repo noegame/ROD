@@ -2,10 +2,10 @@ import cv2
 import numpy as np
 
 # =============================
-# PARAMÈTRES CAMÉRA FISHEYE
+# FISHEYE CAMERA PARAMETERS
 # =============================
 
-# Matrice intrinsèque (valeurs de calibration)
+# Intrinsic matrix (calibration values)
 K = np.array(
     [
         [2.49362477e03, 0.00000000e00, 1.97718701e03],
@@ -14,28 +14,28 @@ K = np.array(
     ]
 )
 
-# Coefficients de distorsion fisheye (k1, k2, k3, k4)
+# Fisheye distortion coefficients (k1, k2, k3, k4)
 D = np.array([-0.1203345, 0.06802544, -0.13779641, 0.08243704])
 # =============================
-# CHARGEMENT IMAGE
+# IMAGE LOADING
 # =============================
 
 image_path = "img1.jpg"
 img = cv2.imread(image_path)
 
 if img is None:
-    raise IOError("Impossible de charger l'image")
+    raise IOError("Cannot load the image")
 
 h, w = img.shape[:2]
 
 # =============================
-# UNDISTORTION FISHEYE
+# FISHEYE UNDISTORTION
 # =============================
 
 balance = 0.4
 scale = 1.5
 
-# Calcul nouvelle matrice caméra
+# Calculate new camera matrix
 new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(
     K, D, (w, h), np.eye(3), balance=balance
 )
@@ -50,23 +50,23 @@ img = cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR)
 # img = cv2.equalizeHist(img)
 
 # =============================
-# DÉTECTION ARUCO
+# ARUCO DETECTION
 # =============================
 
-# Dictionnaire ArUco (ex : 4x4_50)
+# ArUco dictionary (e.g.: 4x4_50)
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
 
 parameters = cv2.aruco.DetectorParameters()
 
 params = cv2.aruco.DetectorParameters()
 
-# # OpenCV teste plusieurs tailles de fenêtres pour seuiller l’image localement.
+# # OpenCV tests multiple window sizes to threshold the image locally.
 # params.adaptiveThreshWinSizeMin = 3
 
-# # OpenCV teste plusieurs tailles de fenêtres pour seuiller l’image localement.
+# # OpenCV tests multiple window sizes to threshold the image locally.
 # params.adaptiveThreshWinSizeMax = 63
 
-# # Taille du pas entre les tailles de fenêtres testées.
+# # Step size between tested window sizes.
 # params.adaptiveThreshWinSizeStep = 4
 
 # params.minMarkerPerimeterRate = 0.015
@@ -80,7 +80,7 @@ detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
 corners, ids, rejected = detector.detectMarkers(img)
 
 # =============================
-# AFFICHAGE RÉSULTATS
+# DISPLAY RESULTS
 # =============================
 
 output = img.copy()
@@ -88,9 +88,9 @@ output = img.copy()
 if ids is not None:
     cv2.aruco.drawDetectedMarkers(output, corners, ids)
     print("\n======")
-    print(f"Tags détectés : {ids.flatten()}")
-    print(f"Nombre de tags détectés : {len(ids)}")
-    print(f"balance : {balance}")
+    print(f"Detected tags: {ids.flatten()}")
+    print(f"Number of detected tags: {len(ids)}")
+    print(f"balance: {balance}")
     print(f"params.minMarkerPerimeterRate : {params.minMarkerPerimeterRate}")
     print(f"params.maxMarkerPerimeterRate : {params.maxMarkerPerimeterRate}")
     print(f"params.polygonalApproxAccuracyRate : {params.polygonalApproxAccuracyRate}")
@@ -98,7 +98,7 @@ if ids is not None:
     print("======\n")
 
 else:
-    print("Aucun tag détecté")
+    print("No tag detected")
 
 output_resized = cv2.resize(output, (1080, 1080))
 cv2.imshow("Aruco detection", output_resized)

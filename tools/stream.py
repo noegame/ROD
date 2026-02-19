@@ -12,12 +12,12 @@ import picamera2
 from flask import Flask, Response
 
 # ---------------------------------------------------------------------------
-# Fonctions principales
+# Main functions
 # ---------------------------------------------------------------------------
 
 app = Flask(__name__)
 
-# Singleton pour la caméra - créée une seule fois
+# Singleton for the camera - created only once
 camera = None
 camera_lock = threading.Lock()
 frame_lock = threading.Lock()
@@ -39,7 +39,7 @@ def initialize_camera():
 
 
 def capture_frame():
-    """Capture une frame et la met en cache"""
+    """Capture a frame and cache it"""
     global current_frame
     stream = io.BytesIO()
     try:
@@ -48,14 +48,14 @@ def capture_frame():
         with frame_lock:
             current_frame = stream.read()
     except Exception as e:
-        print(f"Erreur lors de la capture: {e}")
+        print(f"Error during capture: {e}")
 
 
 def generate_frames():
-    """Génère les frames pour le stream"""
+    """Generate frames for the stream"""
     initialize_camera()
 
-    # Capture les frames continuellement en arrière-plan
+    # Continuously capture frames in the background
     import threading
 
     def capture_loop():
@@ -63,11 +63,11 @@ def generate_frames():
             capture_frame()
             threading.Event().wait(0.04)  # ~25 FPS
 
-    # Démarre le thread de capture
+    # Start the capture thread
     capture_thread = threading.Thread(target=capture_loop, daemon=True)
     capture_thread.start()
 
-    # Envoie les frames aux clients
+    # Send frames to clients
     while True:
         if current_frame:
             with frame_lock:

@@ -2,33 +2,33 @@ import cv2
 import numpy as np
 
 # =============================
-# CHARGEMENT IMAGE
+# IMAGE LOADING
 # =============================
 
 image_path = "image_phone.jpg"
 img = cv2.imread(image_path)
 
 if img is None:
-    raise IOError("Impossible de charger l'image")
+    raise IOError("Cannot load the image")
 
 # =============================
-# PRÉTRAITEMENT
+# PREPROCESSING
 # =============================
 
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-# Amélioration du contraste (utile avec smartphone)
+# Contrast enhancement (useful with smartphone)
 gray = cv2.equalizeHist(gray)
 
 # =============================
-# DÉTECTION ARUCO
+# ARUCO DETECTION
 # =============================
 
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
 
 params = cv2.aruco.DetectorParameters()
 
-# Paramètres assouplis pour 4x4
+# Relaxed parameters for 4x4
 params.adaptiveThreshWinSizeMin = 3
 params.adaptiveThreshWinSizeMax = 55
 params.adaptiveThreshWinSizeStep = 4
@@ -44,7 +44,7 @@ detector = cv2.aruco.ArucoDetector(aruco_dict, params)
 corners, ids, rejected = detector.detectMarkers(gray)
 
 # =============================
-# AFFICHAGE
+# DISPLAY
 # =============================
 
 output = img.copy()
@@ -69,11 +69,11 @@ if ids is not None:
             6,
         )
 
-    print("IDs détectés :", ids.flatten())
+    print("Detected IDs:", ids.flatten())
 else:
-    print("Aucun tag détecté")
+    print("No tag detected")
 
-# Affichage des candidats rejetés (diagnostic)
+# Display rejected candidates (diagnostic)
 # for c in rejected:
 #    cv2.polylines(output, [c.astype(int)], True, (0, 0, 255), 1)
 

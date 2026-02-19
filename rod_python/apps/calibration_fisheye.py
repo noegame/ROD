@@ -4,38 +4,38 @@ import glob
 import os
 
 # =============================
-# PARAMÈTRES DAMIER
+# CHECKERBOARD PARAMETERS
 # =============================
 
-CHECKERBOARD = (6, 9)  # coins internes (largeur, hauteur)
-square_size = 1.0  # taille d'une case (unité arbitraire)
+CHECKERBOARD = (6, 9)  # inner corners (width, height)
+square_size = 1.0  # square size (arbitrary unit)
 
 # =============================
-# DOSSIER IMAGES
+# IMAGE FOLDER
 # =============================
 
 images_path = "2026-01-14-calibration-4000x4000/*.jpg"
 images = glob.glob(images_path)
 
 if len(images) == 0:
-    raise IOError("Aucune image trouvée")
+    raise IOError("No images found")
 
 # =============================
-# PRÉPARATION OBJETS 3D
+# 3D OBJECT PREPARATION
 # =============================
 
 objp = np.zeros((1, CHECKERBOARD[0] * CHECKERBOARD[1], 3), np.float32)
 objp[0, :, :2] = np.mgrid[0 : CHECKERBOARD[0], 0 : CHECKERBOARD[1]].T.reshape(-1, 2)
 objp *= square_size
 
-objpoints = []  # points 3D
-imgpoints = []  # points 2D
+objpoints = []  # 3D points
+imgpoints = []  # 2D points
 
 img_shape = None
 valid_images = 0
 
 # =============================
-# DÉTECTION DAMIER
+# CHECKERBOARD DETECTION
 # =============================
 
 for fname in images:
@@ -77,10 +77,10 @@ for fname in images:
 cv2.destroyAllWindows()
 
 if valid_images < 10:
-    raise RuntimeError("Pas assez d'images valides pour une calibration fiable")
+    raise RuntimeError("Not enough valid images for reliable calibration")
 
 # =============================
-# CALIBRATION FISHEYE
+# FISHEYE CALIBRATION
 # =============================
 
 K = np.zeros((3, 3))
@@ -108,14 +108,14 @@ rms, _, _, _, _ = cv2.fisheye.calibrate(
 )
 
 # =============================
-# RÉSULTATS
+# RESULTS
 # =============================
 
-print("\n=== RÉSULTAT CALIBRATION FISHEYE ===")
-print(f"RMS error : {rms:.6f}\n")
+print("\n=== FISHEYE CALIBRATION RESULT ===")
+print(f"RMS error: {rms:.6f}\n")
 
-print("Matrice intrinsèque K :")
+print("Intrinsic matrix K:")
 print(K)
 
-print("\nCoefficients de distorsion D (k1, k2, k3, k4) :")
+print("\nDistortion coefficients D (k1, k2, k3, k4):")
 print(D.flatten())

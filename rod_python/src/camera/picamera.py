@@ -116,31 +116,31 @@ class PiCamera(Camera):
                 if self.parameters.get("width") != value:
                     self.parameters["width"] = value
                     needs_reconfigure = True
-                logger.info(f"Largeur configurée: {self.parameters.get('width')}")
+                logger.info(f"Width configured: {self.parameters.get('width')}")
 
             elif key == "height":
                 if self.parameters.get("height") != value:
                     self.parameters["height"] = value
                     needs_reconfigure = True
-                logger.info(f"Hauteur configurée: {self.parameters.get('height')}")
+                logger.info(f"Height configured: {self.parameters.get('height')}")
 
             elif key == "config_mode":
                 if value not in ["preview", "still"]:
-                    logger.warning(f"Mode invalide '{value}', utilisation de 'preview'")
+                    logger.warning(f"Invalid mode '{value}', using 'preview'")
                     value = "preview"
                 if self.parameters.get("config_mode") != value:
                     self.parameters["config_mode"] = value
                     needs_reconfigure = True
-                logger.info(f"Mode configuré: {self.parameters.get('config_mode')}")
+                logger.info(f"Mode configured: {self.parameters.get('config_mode')}")
             else:
-                # Contrôles caméra (ExposureTime, AnalogueGain, etc.)
+                # Camera controls (ExposureTime, AnalogueGain, etc.)
                 control_params[key] = value
 
-        # Configurer la caméra si nécessaire et si elle est initialisée
+        # Configure the camera if necessary and if it is initialized
         if needs_reconfigure and self.picamera2:
             try:
                 if self.parameters.get("config_mode") == "still":
-                    logger.info(f"Mode: STILL (captures uniques optimisées, BGR)")
+                    logger.info(f"Mode: STILL (single optimized captures, BGR)")
                     camera_config = self.picamera2.create_still_configuration(
                         main={
                             "format": "BGR888",
@@ -151,7 +151,7 @@ class PiCamera(Camera):
                         }
                     )
                 else:  # "preview" by default
-                    logger.info(f"Mode: PREVIEW (streaming continu, BGR)")
+                    logger.info(f"Mode: PREVIEW (continuous streaming, BGR)")
                     camera_config = self.picamera2.create_preview_configuration(
                         main={
                             "format": "BGR888",
@@ -162,44 +162,44 @@ class PiCamera(Camera):
                         }
                     )
                 self.picamera2.configure(camera_config)
-                logger.info("Configuration de la caméra mise à jour.")
+                logger.info("Camera configuration updated.")
             except Exception as e:
-                logger.error(f"Erreur lors de la configuration de la caméra: {e}")
+                logger.error(f"Error while configuring the camera: {e}")
                 raise
 
-        # Appliquer les contrôles caméra si la caméra est initialisée
+        # Apply camera controls if the camera is initialized
         if control_params:
             try:
                 if self.picamera2:
                     self.picamera2.set_controls(control_params)
-                    logger.info(f"Contrôles caméra configurés: {control_params}")
+                    logger.info(f"Camera controls configured: {control_params}")
                 else:
                     logger.warning(
-                        f"Caméra non initialisée, contrôles ignorés: {control_params}"
+                        f"Camera not initialized, ignored controls: {control_params}"
                     )
             except Exception as e:
-                logger.error(f"Erreur lors de la configuration des contrôles: {e}")
+                logger.error(f"Error while configuring controls: {e}")
                 raise
 
     def take_picture(self) -> np.ndarray:
         """
-        Capture une photo et la retourne directement (sans sauvegarde).
+        Capture a photo and return it directly (without saving).
 
-        :return: Image capturée en tant que np.ndarray (format RGB)
+        :return: Captured image as np.ndarray (RGB format)
         """
         try:
             if not self.picamera2:
-                raise Exception("La caméra n'est pas initialisée.")
+                raise Exception("The camera is not initialized.")
 
-            # Capture directe de l'image
+            # Direct image capture
             picture = self.picamera2.capture_array()
-            logger.debug(f"Image capturée: {picture.shape}")
+            logger.debug(f"Image captured: {picture.shape}")
             return picture
 
         except Exception as e:
-            logger.error(f"Erreur lors de la capture d'image: {e}")
+            logger.error(f"Error while capturing image: {e}")
             raise
 
     def close(self):
-        """Ferme et nettoie la caméra proprement (alias pour stop())."""
+        """Close and cleanup the camera properly (alias for stop())."""
         self.stop()

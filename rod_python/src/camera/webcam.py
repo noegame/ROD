@@ -128,21 +128,21 @@ class Webcam(Camera):
                 logger.info(f"Hauteur configurée: {self.height}")
             elif key == "device_id":
                 self.device_id = value
-                logger.info(f"Device ID configuré: {self.device_id}")
+                logger.info(f"Device ID configured: {self.device_id}")
             else:
-                # Propriétés OpenCV
+                # OpenCV properties
                 opencv_params[key] = value
 
-        # Appliquer les propriétés OpenCV si la webcam est initialisée
+        # Apply OpenCV properties if the webcam is initialized
         if opencv_params:
             try:
                 if self.capture is None or not self.capture.isOpened():
                     logger.warning(
-                        f"Webcam non initialisée, propriétés ignorées: {opencv_params}"
+                        f"Webcam not initialized, ignored properties: {opencv_params}"
                     )
                     return
 
-                # Mapping des noms de paramètres lisibles vers les propriétés OpenCV
+                # Mapping of readable parameter names to OpenCV properties
                 param_mapping = {
                     "brightness": cv2.CAP_PROP_BRIGHTNESS,
                     "contrast": cv2.CAP_PROP_CONTRAST,
@@ -158,43 +158,43 @@ class Webcam(Camera):
                         prop_id = param_mapping[param_name]
                         success = self.capture.set(prop_id, value)
                         if success:
-                            logger.info(f"Paramètre '{param_name}' configuré à {value}")
+                            logger.info(f"Parameter '{param_name}' configured to {value}")
                         else:
                             logger.warning(
-                                f"Impossible de configurer le paramètre '{param_name}'"
+                                f"Unable to configure parameter '{param_name}'"
                             )
                     else:
-                        logger.warning(f"Paramètre inconnu: '{param_name}'")
+                        logger.warning(f"Unknown parameter: '{param_name}'")
 
             except Exception as e:
-                logger.error(f"Erreur lors de la configuration des paramètres: {e}")
+                logger.error(f"Error while configuring parameters: {e}")
                 raise
 
     def take_picture(self) -> np.ndarray:
         """
-        Capture une image depuis la webcam.
+        Capture an image from the webcam.
 
-        :return: Image capturée en tant que np.ndarray (format RGB)
+        :return: Captured image as np.ndarray (RGB format)
         """
         try:
             if self.capture is None:
-                raise Exception("La webcam n'est pas initialisée.")
+                raise Exception("The webcam is not initialized.")
 
             ret, frame = self.capture.read()
 
             if not ret:
-                raise Exception("Échec de la capture d'image depuis la webcam")
+                raise Exception("Failed to capture image from the webcam")
 
-            # OpenCV lit les images en BGR, on convertit en RGB
+            # OpenCV reads images in BGR, we convert to RGB
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             logger.debug(f"Image capturée: {frame_rgb.shape}")
 
             return frame_rgb
 
         except Exception as e:
-            logger.error(f"Erreur lors de la capture d'image: {e}")
+            logger.error(f"Error while capturing image: {e}")
             raise
 
     def close(self):
-        """Ferme et nettoie la webcam proprement (alias pour stop())."""
+        """Close and cleanup the webcam properly (alias for stop())."""
         self.stop()
