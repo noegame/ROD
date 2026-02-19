@@ -134,6 +134,5 @@ install(TARGETS
     test_detection_dataset
     test_camera_interface
     test_emulated_camera_impl
-    test_emulated_camera
     RUNTIME DESTINATION bin
 )
