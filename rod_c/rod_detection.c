@@ -116,6 +116,14 @@ static int init_app_context(AppContext* ctx, CameraType camera_type, const char*
         return -1;
     }
     
+    // Set camera resolution to full IMX477 sensor resolution (4056x3040)
+    if (camera_interface_set_size(ctx->camera, 4056, 3040) != 0) {
+        fprintf(stderr, "Failed to set camera resolution to 4056x3040\n");
+        camera_destroy(ctx->camera);
+        return -1;
+    }
+    printf("Camera resolution set to 4056x3040\n");
+    
     // Configure camera based on type
     if (camera_type == CAMERA_TYPE_EMULATED) {
         // Set image folder for emulated camera
@@ -125,12 +133,22 @@ static int init_app_context(AppContext* ctx, CameraType camera_type, const char*
         }
         printf("Emulated camera folder: %s\n", image_folder);
     } else {
-        // Configure real camera parameters
+        // Configure real camera with IMX477 tuned parameters
+        // Based on imx477_tuned configuration from test_camera_parameters.c
+        // Optimized for auto-exposure with IMX477 tuning file settings
         RodCameraParameters params;
-        camera_get_default_parameters(&params);
-        // Use defaults for now, can be customized here
+        params.exposure_time = -1;           // Let AE decide based on tuning file
+        params.analogue_gain = -1.0f;        // Let AE decide based on tuning file
+        params.brightness = 0.0f;            // Default brightness
+        params.contrast = 1.0f;              // CE enabled with gamma curve in tuning file
+        params.saturation = 1.0f;            // Default saturation
+        params.sharpness = 1.0f;             // Default sharpen strength from imx477.json
+        params.awb_enable = 1;               // Auto white balance enabled
+        params.aec_enable = 1;               // Auto-exposure enabled (uses IMX477 exposure curves)
+        params.noise_reduction_mode = 2;     // HighQuality (matches denoise settings)
+        
         camera_interface_set_parameters(ctx->camera, &params);
-        printf("Real camera using default parameters\n");
+        printf("Real camera using IMX477 tuned parameters (auto-exposure enabled)\n");
     }
     
     // Start camera
@@ -173,9 +191,8 @@ static int init_app_context(AppContext* ctx, CameraType camera_type, const char*
     snprintf(first_image, sizeof(first_image), "%s/IMG_1415.JPG", image_folder);
     
     // Create mask with 1.1x vertical scale (to include slightly outside field)
-    // Mask dimensions will match camera output (need to get from camera)
-    // For now, use standard resolution - will be resized if needed
-    ctx->field_mask = create_field_mask(first_image, ctx->detector, 4032, 3024, 1.1f, NULL);
+    // Mask dimensions match camera output resolution (4056x3040)
+    ctx->field_mask = create_field_mask(first_image, ctx->detector, 4056, 3040, 1.1f, NULL);
     
     if (!ctx->field_mask) {
         fprintf(stderr, "Warning: Failed to create field mask, continuing without masking\n");
