@@ -61,6 +61,12 @@ int camera_set_size(CameraContext* ctx, int width, int height) {
         return -1;
     }
 
+    // Validate dimensions
+    if (width <= 0 || height <= 0) {
+        fprintf(stderr, "Error: Invalid dimensions %dx%d (must be positive)\n", width, height);
+        return -1;
+    }
+
     ctx->width = width;
     ctx->height = height;
 
