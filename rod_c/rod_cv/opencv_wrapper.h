@@ -133,6 +133,20 @@ ImageHandle* sharpen_image(ImageHandle* image);
 // Resize image
 ImageHandle* resize_image(ImageHandle* image, int new_width, int new_height);
 
+// ===== Optimized versions with buffer reuse (reduce allocations) =====
+
+// Apply sharpening filter - reuse dst buffer if provided (must be same size as src)
+// If dst is NULL, allocates new image. Returns dst or newly allocated image.
+ImageHandle* sharpen_image_reuse(ImageHandle* src, ImageHandle* dst);
+
+// Resize image - reuse dst buffer if provided (must be new_width x new_height)
+// If dst is NULL, allocates new image. Returns dst or newly allocated image.
+ImageHandle* resize_image_reuse(ImageHandle* src, int new_width, int new_height, ImageHandle* dst);
+
+// Apply mask - reuse dst buffer if provided (must be same size as src)
+// If dst is NULL, allocates new image. Returns dst or newly allocated image.
+ImageHandle* bitwise_and_mask_reuse(ImageHandle* src, ImageHandle* mask, ImageHandle* dst);
+
 // ===== Drawing Functions =====
 
 // Color structure for drawing

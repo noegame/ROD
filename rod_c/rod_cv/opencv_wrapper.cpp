@@ -137,8 +137,25 @@ int save_image(const char* path, ImageHandle* handle) {
         return 0;
     }
     
-    // Try to save the image
-    bool success = cv::imwrite(path, *image);
+    // Determine file extension and set appropriate compression parameters
+    std::vector<int> compression_params;
+    const char* ext = strrchr(path, '.');
+    if (ext != nullptr) {
+        // PNG format: use low compression (1 = fastest, minimal compression)
+        // Lower compression = faster saving, slightly larger files
+        if (strcasecmp(ext, ".png") == 0) {
+            compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
+            compression_params.push_back(1);  // Compression level 1 (fast, low compression)
+        }
+        // JPEG format: use high quality (95 = high quality)
+        else if (strcasecmp(ext, ".jpg") == 0 || strcasecmp(ext, ".jpeg") == 0) {
+            compression_params.push_back(cv::IMWRITE_JPEG_QUALITY);
+            compression_params.push_back(95);
+        }
+    }
+    
+    // Try to save the image with compression parameters
+    bool success = cv::imwrite(path, *image, compression_params);
     if (!success) {
         fprintf(stderr, "save_image: cv::imwrite failed for path %s\n", path);
     }
@@ -444,6 +461,93 @@ ImageHandle* resize_image(ImageHandle* image, int new_width, int new_height) {
     cv::resize(*src, *dst, cv::Size(new_width, new_height));
     
     return reinterpret_cast<ImageHandle*>(dst);
+}
+
+// ===== Optimized versions with buffer reuse =====
+
+ImageHandle* sharpen_image_reuse(ImageHandle* src, ImageHandle* dst) {
+    if (src == nullptr) return nullptr;
+    
+    cv::Mat* src_mat = reinterpret_cast<cv::Mat*>(src);
+    cv::Mat* dst_mat = nullptr;
+    
+    if (dst == nullptr) {
+        // No buffer provided, allocate new one
+        dst_mat = new cv::Mat();
+    } else {
+        // Reuse provided buffer
+        dst_mat = reinterpret_cast<cv::Mat*>(dst);
+        // Ensure buffer has correct dimensions
+        if (dst_mat->rows != src_mat->rows || 
+            dst_mat->cols != src_mat->cols || 
+            dst_mat->type() != src_mat->type()) {
+            // Reallocate if size mismatch
+            *dst_mat = cv::Mat(src_mat->rows, src_mat->cols, src_mat->type());
+        }
+    }
+    
+    // Sharpening kernel
+    cv::Mat kernel = (cv::Mat_<float>(3, 3) << 
+        -1, -1, -1,
+        -1,  9, -1,
+        -1, -1, -1);
+    
+    cv::filter2D(*src_mat, *dst_mat, -1, kernel);
+    
+    return reinterpret_cast<ImageHandle*>(dst_mat);
+}
+
+ImageHandle* resize_image_reuse(ImageHandle* src, int new_width, int new_height, ImageHandle* dst) {
+    if (src == nullptr) return nullptr;
+    
+    cv::Mat* src_mat = reinterpret_cast<cv::Mat*>(src);
+    cv::Mat* dst_mat = nullptr;
+    
+    if (dst == nullptr) {
+        // No buffer provided, allocate new one
+        dst_mat = new cv::Mat();
+    } else {
+        // Reuse provided buffer
+        dst_mat = reinterpret_cast<cv::Mat*>(dst);
+        // Ensure buffer has correct dimensions
+        if (dst_mat->rows != new_height || 
+            dst_mat->cols != new_width || 
+            dst_mat->type() != src_mat->type()) {
+            // Reallocate if size mismatch
+            *dst_mat = cv::Mat(new_height, new_width, src_mat->type());
+        }
+    }
+    
+    cv::resize(*src_mat, *dst_mat, cv::Size(new_width, new_height));
+    
+    return reinterpret_cast<ImageHandle*>(dst_mat);
+}
+
+ImageHandle* bitwise_and_mask_reuse(ImageHandle* src, ImageHandle* mask, ImageHandle* dst) {
+    if (src == nullptr || mask == nullptr) return nullptr;
+    
+    cv::Mat* src_mat = reinterpret_cast<cv::Mat*>(src);
+    cv::Mat* mask_mat = reinterpret_cast<cv::Mat*>(mask);
+    cv::Mat* dst_mat = nullptr;
+    
+    if (dst == nullptr) {
+        // No buffer provided, allocate new one
+        dst_mat = new cv::Mat();
+    } else {
+        // Reuse provided buffer
+        dst_mat = reinterpret_cast<cv::Mat*>(dst);
+        // Ensure buffer has correct dimensions
+        if (dst_mat->rows != src_mat->rows || 
+            dst_mat->cols != src_mat->cols || 
+            dst_mat->type() != src_mat->type()) {
+            // Reallocate if size mismatch
+            *dst_mat = cv::Mat(src_mat->rows, src_mat->cols, src_mat->type());
+        }
+    }
+    
+    cv::bitwise_and(*src_mat, *src_mat, *dst_mat, *mask_mat);
+    
+    return reinterpret_cast<ImageHandle*>(dst_mat);
 }
 
 // ===== Drawing Functions =====

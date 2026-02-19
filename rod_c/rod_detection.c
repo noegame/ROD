@@ -12,6 +12,7 @@
  * - Sends detected positions to the IPC thread via socket communication
  */
 
+#define _POSIX_C_SOURCE 199309L  // Required for clock_gettime and CLOCK_MONOTONIC
 
 /* ******************************************************* Includes ****************************************************** */
 
@@ -28,6 +29,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <time.h>
 
 /* ***************************************************** Public macros *************************************************** */
 
@@ -62,6 +64,12 @@ typedef struct {
     DetectorParametersHandle* params;
     RodSocketServer* socket_server;
     ImageHandle* field_mask;  // Field mask for filtering detections
+    
+    // Reusable buffers to reduce memory allocations
+    ImageHandle* buffer_sharpened;  // Buffer for sharpened image
+    ImageHandle* buffer_masked;     // Buffer for masked image
+    ImageHandle* buffer_resized;    // Buffer for resized image
+    
     bool running;
 } AppContext;
 
@@ -96,6 +104,16 @@ static volatile bool g_running = true;
 
 /* ******************************************* Public callback functions declarations ************************************ */
 
+/**
+ * @brief Get current time in milliseconds
+ * @return Time in milliseconds  
+ */
+static double get_time_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1000000.0;
+}
+
 static void signal_handler(int signum) {
     (void)signum;  // Unused parameter
     g_running = false;
@@ -105,6 +123,10 @@ static void signal_handler(int signum) {
 static int init_app_context(AppContext* ctx, CameraType camera_type, const char* image_folder) {
     memset(ctx, 0, sizeof(AppContext));
     ctx->socket_server = NULL;
+    ctx->field_mask = NULL;
+    ctx->buffer_sharpened = NULL;
+    ctx->buffer_masked = NULL;
+    ctx->buffer_resized = NULL;
     ctx->running = true;
     
     // Initialize camera based on type
@@ -205,6 +227,22 @@ static int init_app_context(AppContext* ctx, CameraType camera_type, const char*
 
 static void cleanup_app_context(AppContext* ctx) {
     if (!ctx) return;
+    
+    // Release reusable buffers
+    if (ctx->buffer_resized) {
+        release_image(ctx->buffer_resized);
+        ctx->buffer_resized = NULL;
+    }
+    
+    if (ctx->buffer_masked) {
+        release_image(ctx->buffer_masked);
+        ctx->buffer_masked = NULL;
+    }
+    
+    if (ctx->buffer_sharpened) {
+        release_image(ctx->buffer_sharpened);
+        ctx->buffer_sharpened = NULL;
+    }
     
     // Release field mask
     if (ctx->field_mask) {
@@ -313,6 +351,7 @@ int main(int argc, char* argv[]) {
     int frame_count = 0;
     while (g_running && ctx.running) {
         frame_count++;
+        double t_loop_start = get_time_ms();
         
         // Try to accept a client connection if not already connected
         rod_socket_server_accept(ctx.socket_server);
@@ -321,6 +360,7 @@ int main(int argc, char* argv[]) {
         uint8_t* image_buffer = NULL;
         int width, height;
         size_t size;
+        double t_capture_start = get_time_ms();
         
         if (camera_interface_capture_frame(ctx.camera, &image_buffer, 
                                 &width, &height, &size) != 0) {
@@ -328,11 +368,14 @@ int main(int argc, char* argv[]) {
             usleep(10000);  // Wait 10ms before retry
             continue;
         }
+        double t_capture_end = get_time_ms();
         
         // Create OpenCV image handle from BGR buffer
         // Camera returns BGR format (format=0, OpenCV native - no conversion)
+        double t_create_start = get_time_ms();
         ImageHandle* original_image = create_image_from_buffer(image_buffer, width, height, 3, 0);
         free(image_buffer);  // Buffer is copied by create_image_from_buffer
+        double t_create_end = get_time_ms();
         
         if (!original_image) {
             fprintf(stderr, "Failed to create image from buffer\n");
@@ -341,34 +384,39 @@ int main(int argc, char* argv[]) {
         }
         
         // ===== PREPROCESSING PIPELINE (matching Python implementation) =====
-        // Step 1: Apply sharpening filter to enhance marker edges
-        ImageHandle* sharpened_image = sharpen_image(original_image);
-        if (!sharpened_image) {
+        // Step 1: Apply sharpening filter to enhance marker edges (reuse buffer)
+        double t_sharpen_start = get_time_ms();
+        ctx.buffer_sharpened = sharpen_image_reuse(original_image, ctx.buffer_sharpened);
+        double t_sharpen_end = get_time_ms();
+        if (!ctx.buffer_sharpened) {
             fprintf(stderr, "Failed to sharpen image\n");
             release_image(original_image);
             usleep(10000);
             continue;
         }
         
-        // Step 2: Apply field mask to filter out areas outside the playing field
-        ImageHandle* masked_image = sharpened_image;
+        // Step 2: Apply field mask to filter out areas outside the playing field (reuse buffer)
+        double t_mask_start = get_time_ms();
+        ImageHandle* masked_image = ctx.buffer_sharpened;  // Default to sharpened
         if (ctx.field_mask) {
-            masked_image = bitwise_and_mask(sharpened_image, ctx.field_mask);
-            if (!masked_image) {
+            ctx.buffer_masked = bitwise_and_mask_reuse(ctx.buffer_sharpened, ctx.field_mask, ctx.buffer_masked);
+            if (!ctx.buffer_masked) {
                 fprintf(stderr, "Failed to apply mask, using unmasked image\n");
-                masked_image = sharpened_image;
+                masked_image = ctx.buffer_sharpened;
             } else {
-                // Release sharpened_image since we now have masked_image
-                release_image(sharpened_image);
+                masked_image = ctx.buffer_masked;
             }
         }
+        double t_mask_end = get_time_ms();
         
-        // Step 3: Resize image (1.5x scale) for better detection of small/distant markers
+        // Step 3: Resize image (1.5x scale) for better detection of small/distant markers (reuse buffer)
+        double t_resize_start = get_time_ms();
         int new_width = (int)(width * DETECTION_SCALE_FACTOR);
         int new_height = (int)(height * DETECTION_SCALE_FACTOR);
-        ImageHandle* resized_image = resize_image(masked_image, new_width, new_height);
+        ctx.buffer_resized = resize_image_reuse(masked_image, new_width, new_height, ctx.buffer_resized);
         
-        if (!resized_image) {
+        double t_resize_end = get_time_ms();
+        if (!ctx.buffer_resized) {
             fprintf(stderr, "Failed to resize image\n");
             release_image(original_image);
             usleep(10000);
@@ -376,10 +424,13 @@ int main(int argc, char* argv[]) {
         }
         
         // Step 3: Detect ArUco markers on preprocessed image
-        DetectionResult* detection = detectMarkersWithConfidence(ctx.detector, resized_image);
-        release_image(resized_image);  // Don't need resized image anymore
+        double t_detect_start = get_time_ms();
+        DetectionResult* detection = detectMarkersWithConfidence(ctx.detector, ctx.buffer_resized);
+        // Note: We keep buffer_resized for reuse in next frame
+        double t_detect_end = get_time_ms();
         
         // Step 4: Scale coordinates back to original image size
+        double t_process_start = get_time_ms();
         if (detection && detection->count > 0) {
             for (int i = 0; i < detection->count; i++) {
                 for (int j = 0; j < 4; j++) {
@@ -395,11 +446,14 @@ int main(int argc, char* argv[]) {
             int valid_count = filter_valid_markers(detection, markers, 100);
             
             // Send detection results
+            double t_send_start = get_time_ms();
             if (valid_count > 0) {
                 rod_socket_server_send_detections(ctx.socket_server, markers, valid_count);
             }
+            double t_send_end = get_time_ms();
             
             // Save images periodically (raw camera + debug annotated)
+            double t_save_start = get_time_ms();
             if (frame_count % SAVE_DEBUG_IMAGE_INTERVAL == 0) {
                 // Generate timestamp for filenames
                 char timestamp[32];
@@ -447,12 +501,37 @@ int main(int argc, char* argv[]) {
                     printf("Images saved: %s.png and %s_debug.png (markers: %d)\n", timestamp, timestamp, valid_count);
                 }
             }
+            double t_save_end = get_time_ms();
+            
+            // Print timing breakdown
+            double t_loop_end = get_time_ms();
+            printf("[Frame %d] Timings: capture=%.1fms create=%.1fms sharpen=%.1fms mask=%.1fms resize=%.1fms detect=%.1fms process+send=%.1fms save=%.1fms | TOTAL=%.1fms (markers: %d)\n",
+                   frame_count,
+                   t_capture_end - t_capture_start,
+                   t_create_end - t_create_start,
+                   t_sharpen_end - t_sharpen_start,
+                   t_mask_end - t_mask_start,
+                   t_resize_end - t_resize_start,
+                   t_detect_end - t_detect_start,
+                   t_send_end - t_process_start,
+                   t_save_end - t_save_start,
+                   t_loop_end - t_loop_start,
+                   valid_count);
             
             releaseDetectionResult(detection);
         } else {
             // No markers detected
+            double t_loop_end = get_time_ms();
             if (frame_count % 10 == 0) {
-                printf("Frame %d: No markers detected\n", frame_count);
+                printf("[Frame %d] No markers | Timings: capture=%.1fms create=%.1fms sharpen=%.1fms mask=%.1fms resize=%.1fms detect=%.1fms | TOTAL=%.1fms\n",
+                       frame_count,
+                       t_capture_end - t_capture_start,
+                       t_create_end - t_create_start,
+                       t_sharpen_end - t_sharpen_start,
+                       t_mask_end - t_mask_start,
+                       t_resize_end - t_resize_start,
+                       t_detect_end - t_detect_start,
+                       t_loop_end - t_loop_start);
             }
             
             // Save images periodically even when no markers detected
@@ -481,8 +560,7 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // Release images
-        release_image(masked_image);
+        // Release only original_image (buffers are reused and freed in cleanup)
         release_image(original_image);
     }
     
