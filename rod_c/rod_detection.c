@@ -51,7 +51,7 @@
 #define SAVE_DEBUG_IMAGE_INTERVAL ROD_SAVE_DEBUG_IMAGE_INTERVAL
 
 // Detection pipeline parameters (must match Python implementation)
-#define DETECTION_SCALE_FACTOR 1.5f  // Resize scale for better detection
+#define DETECTION_SCALE_FACTOR 1.0f  // Resize scale for better detection
 
 /* ************************************************** Public types definition ******************************************** */
 
@@ -140,7 +140,7 @@ static int init_app_context(AppContext* ctx, CameraType camera_type, const char*
     }
     
     // Set camera resolution to full IMX477 sensor resolution (4056x3040)
-    if (camera_interface_set_size(ctx->camera, 4056, 3040) != 0) {
+    if (camera_interface_set_size(ctx->camera, 1920, 1080) != 0) {
         fprintf(stderr, "Failed to set camera resolution to 4056x3040\n");
         camera_destroy(ctx->camera);
         return -1;
