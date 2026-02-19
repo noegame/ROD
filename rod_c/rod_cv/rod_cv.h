@@ -164,5 +164,18 @@ ImageHandle* create_field_mask(const char* image_path,
                                 float scale_y,
                                 float* homography_inv);
 
+/**
+ * @brief Create field mask from in-memory image (no disk I/O)
+ * 
+ * Same as create_field_mask but takes ImageHandle* instead of file path.
+ * This allows creating mask dynamically from captured frames.
+ */
+ImageHandle* create_field_mask_from_image(ImageHandle* image,
+                                           ArucoDetectorHandle* detector,
+                                           int output_width, 
+                                           int output_height,
+                                           float scale_y,
+                                           float* homography_inv);
+
 
 /* ******************************************* Public callback functions declarations ************************************ */

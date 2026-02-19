@@ -151,30 +151,22 @@ MarkerCounts count_markers_by_category(MarkerData* markers, int count) {
     return counts;
 }
 
-ImageHandle* create_field_mask(const char* image_path, 
-                                ArucoDetectorHandle* detector,
-                                int output_width, 
-                                int output_height,
-                                float scale_y,
-                                float* homography_inv) {
-    if (!image_path || !detector) {
-        fprintf(stderr, "create_field_mask: invalid parameters\n");
+ImageHandle* create_field_mask_from_image(ImageHandle* image,
+                                           ArucoDetectorHandle* detector,
+                                           int output_width, 
+                                           int output_height,
+                                           float scale_y,
+                                           float* homography_inv) {
+    if (!image || !detector) {
+        fprintf(stderr, "create_field_mask_from_image: invalid parameters\n");
         return NULL;
     }
     
-    // Load reference image
-    ImageHandle* img = load_image(image_path);
-    if (!img) {
-        fprintf(stderr, "create_field_mask: failed to load image %s\n", image_path);
-        return NULL;
-    }
-    
-    int img_width = get_image_width(img);
-    int img_height = get_image_height(img);
+    int img_width = get_image_width(image);
+    int img_height = get_image_height(image);
     
     // Detect ArUco tags
-    DetectionResult* detection = detectMarkersWithConfidence(detector, img);
-    release_image(img);
+    DetectionResult* detection = detectMarkersWithConfidence(detector, image);
     
     if (!detection || detection->count == 0) {
         fprintf(stderr, "create_field_mask: no markers detected\n");
@@ -315,9 +307,33 @@ ImageHandle* create_field_mask(const char* image_path,
     release_image(mask);
     
     if (!filled_mask) {
-        fprintf(stderr, "create_field_mask: failed to fill polygon\n");
+        fprintf(stderr, "create_field_mask_from_image: failed to fill polygon\n");
         return NULL;
     }
     
     return filled_mask;
 }
+
+ImageHandle* create_field_mask(const char* image_path, 
+                                ArucoDetectorHandle* detector,
+                                int output_width, 
+                                int output_height,
+                                float scale_y,
+                                float* homography_inv) {
+    if (!image_path || !detector) {
+        fprintf(stderr, "create_field_mask: invalid parameters\n");
+        return NULL;
+    }
+    
+    // Load reference image
+    ImageHandle* img = load_image(image_path);
+    if (!img) {
+        fprintf(stderr, "create_field_mask: failed to load image %s\n", image_path);
+        return NULL;
+    }
+    
+    // Use the from_image version
+    ImageHandle* mask = create_field_mask_from_image(img, detector, output_width, output_height, scale_y, homography_inv);
+    release_image(img);
+    
+    return mask;}

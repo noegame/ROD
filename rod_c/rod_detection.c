@@ -204,24 +204,10 @@ static int init_app_context(AppContext* ctx, CameraType camera_type, const char*
     }
     printf("ArUco detector initialized (DICT_4X4_50)\n");
     
-    // Create field mask from first image in folder
-    // This mask will be used to filter detections outside the playing field
-    printf("Creating field mask...\n");
-    
-    // Get first image path from the folder
-    char first_image[512];
-    snprintf(first_image, sizeof(first_image), "%s/IMG_1415.JPG", image_folder);
-    
-    // Create mask with 1.1x vertical scale (to include slightly outside field)
-    // Mask dimensions match camera output resolution (4056x3040)
-    ctx->field_mask = create_field_mask(first_image, ctx->detector, 4056, 3040, 1.1f, NULL);
-    
-    if (!ctx->field_mask) {
-        fprintf(stderr, "Warning: Failed to create field mask, continuing without masking\n");
-        ctx->field_mask = NULL;
-    } else {
-        printf("Field mask created successfully\n");
-    }
+    // Field mask will be created dynamically from first captured frame
+    // that contains all 4 fixed markers (IDs 20-23)
+    printf("Field mask will be created dynamically from captured frames\n");
+    ctx->field_mask = NULL;
     
     return 0;
 }
@@ -396,8 +382,17 @@ int main(int argc, char* argv[]) {
             continue;
         }
         
-        // Step 2: Apply field mask to filter out areas outside the playing field (reuse buffer)
+        // Step 2: Create field mask if not already created (from current frame)
         double t_mask_start = get_time_ms();
+        if (!ctx.field_mask) {
+            // Try to create mask from current sharpened image
+            ctx.field_mask = create_field_mask_from_image(ctx.buffer_sharpened, ctx.detector, width, height, 1.1f, NULL);
+            if (ctx.field_mask) {
+                printf("[Frame %d] Field mask created successfully from captured frame\n", frame_count);
+            }
+        }
+        
+        // Step 3: Apply field mask to filter out areas outside the playing field (reuse buffer)
         ImageHandle* masked_image = ctx.buffer_sharpened;  // Default to sharpened
         if (ctx.field_mask) {
             ctx.buffer_masked = bitwise_and_mask_reuse(ctx.buffer_sharpened, ctx.field_mask, ctx.buffer_masked);
@@ -410,7 +405,7 @@ int main(int argc, char* argv[]) {
         }
         double t_mask_end = get_time_ms();
         
-        // Step 3: Resize image (1.5x scale) for better detection of small/distant markers (reuse buffer)
+        // Step 4: Resize image (1.5x scale) for better detection of small/distant markers (reuse buffer)
         double t_resize_start = get_time_ms();
         int new_width = (int)(width * DETECTION_SCALE_FACTOR);
         int new_height = (int)(height * DETECTION_SCALE_FACTOR);
@@ -424,13 +419,13 @@ int main(int argc, char* argv[]) {
             continue;
         }
         
-        // Step 3: Detect ArUco markers on preprocessed image
+        // Step 5: Detect ArUco markers on preprocessed image
         double t_detect_start = get_time_ms();
         DetectionResult* detection = detectMarkersWithConfidence(ctx.detector, ctx.buffer_resized);
         // Note: We keep buffer_resized for reuse in next frame
         double t_detect_end = get_time_ms();
         
-        // Step 4: Scale coordinates back to original image size
+        // Step 6: Scale coordinates back to original image size
         double t_process_start = get_time_ms();
         if (detection && detection->count > 0) {
             for (int i = 0; i < detection->count; i++) {
