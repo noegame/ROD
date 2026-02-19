@@ -19,50 +19,30 @@ The communication thread is responsible for printing the detected objects coordi
 
 The computer vision thread send to the communication thread via socket an array that contain the list of detected objects with their coordinates [[id, x,y,angle], [id, x,y,angle], ...].
 
-```plantuml
-rectangle "File structure"{
-    folder "rod" {
-        file "rod_com.c"
-        file "rod_detection.c"
-        folder "rod_cv" {
-            file "rod_cv.c"
-            file "opencv-wrapper.cpp"
-            file "opencv-wrapper.h"
-        }
-        folder "rod_camera" {
-            file "rod_camera.c"
-            file "libcamera-wrapper.cpp"
-            file "libcamera-wrapper.h"
-        }
-        folder "rod_communication" {
-            file "rod_communication.c"
-        }
-        folder "rod_config" {
-            file "rod_config.c"
-        }
-        folder "rod_socket" {
-            file "rod_socket.c"
-        }
-        folder "rod_utils" {
-            file "rod_utils.c"
-        }
-    }
-}
-```
+
 
 ```plantuml
-rectangle "Component diagram"{
-
-    component "com" as rod{
-        file "rod_com.c"
+rectangle "Processus ROD" {
+    rectangle "Thread Computer Vision" {
+        rectangle "Take picture" as Take_picture {
+        }
+        rectangle "Detect ArUco TAGs" as Detect_ArUco_TAGs {
+        }
+        rectangle "Calculate coordinates" as Calculate_coordinates {
+        }
+        rectangle "Send coordinates to communication thread via socket" as socket{
+        }
+        Take_picture            --> Detect_ArUco_TAGs
+        Detect_ArUco_TAGs       --> Calculate_coordinates
+        Calculate_coordinates   --> socket
     }
-
-    component "detection" as detection{
-        file "rod_detection.c"
-
+    rectangle "Thread Communication" {
+        rectangle "Receive coordinates from computer vision thread via socket" as receive_socket {
+        }
+        rectangle "Print coordinates in console" as print_coordinates {
+        }
+        receive_socket         --> print_coordinates
     }
-
-    rod <-- detection : "socket communication"
 }
 ```
 

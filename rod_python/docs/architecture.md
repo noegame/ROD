@@ -8,5 +8,7 @@ rod_python/
 ├── setup/          # Installation and setup files
 ├── src/
     ├── main.py     # Entry point of the main application
-
+    ├── camera/     # Camera interface and related functionality
+    ├── cv/         # Computer vision algorithms and utilities
+    |── threads/    # Thread management and synchronization
 ```
