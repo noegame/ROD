@@ -1,0 +1,10 @@
+# ROD Python Dependencies
+# Core computer vision and image processing
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Web UI for visualization
+flask>=2.3.0
+
+# Raspberry Pi camera support (only needed on RPi)
+picamera2>=0.3.0
