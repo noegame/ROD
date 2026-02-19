@@ -12,11 +12,10 @@
 #include "rod_visualization.h"
 #include "opencv_wrapper.h"
 #include "rod_cv.h"
+#include "rod_config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <sys/time.h>
 
 /* ***************************************************** Public macros *************************************************** */
 
@@ -108,26 +107,20 @@ void rod_viz_annotate_with_counter(ImageHandle* image, MarkerCounts counts) {
 }
 
 void rod_viz_generate_timestamp(char* buffer, size_t buffer_size) {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    
-    struct tm* tm_info = localtime(&tv.tv_sec);
-    int milliseconds = tv.tv_usec / 1000;
-    
-    // Generate timestamp: YYYYMMDD_HHMMSS_mmm
-    snprintf(buffer, buffer_size, "%04d%02d%02d_%02d%02d%02d_%03d",
-             tm_info->tm_year + 1900,
-             tm_info->tm_mon + 1,
-             tm_info->tm_mday,
-             tm_info->tm_hour,
-             tm_info->tm_min,
-             tm_info->tm_sec,
-             milliseconds);
+    // Delegate to rod_config function
+    rod_config_generate_filename_timestamp(buffer, buffer_size);
 }
 
 int rod_viz_save_debug_image(ImageHandle* image, MarkerData* markers, int count, 
-                              int frame_count, const char* output_folder) {
+                              int frame_count __attribute__((unused)), const char* output_folder) {
     if (!image || !output_folder) {
+        return -1;
+    }
+    
+    // Ensure date-based subfolder exists
+    char date_folder[256];
+    if (rod_config_ensure_date_folder(output_folder, date_folder, sizeof(date_folder)) != 0) {
+        fprintf(stderr, "Failed to create date folder\n");
         return -1;
     }
     
@@ -170,9 +163,13 @@ int rod_viz_save_debug_image(ImageHandle* image, MarkerData* markers, int count,
         rod_viz_annotate_with_centers(annotated, markers, count);
     }
     
-    // Build filename
+    // Generate timestamp for filename
+    char timestamp[32];
+    rod_config_generate_filename_timestamp(timestamp, sizeof(timestamp));
+    
+    // Build filename: date_folder/YYYYMMDD_HHMMSS_MS_debug.png
     char filename[512];
-    snprintf(filename, sizeof(filename), "%s/frame_%06d.jpg", output_folder, frame_count);
+    snprintf(filename, sizeof(filename), "%s/%s_debug.png", date_folder, timestamp);
     
     // Save image
     int success = save_image(filename, annotated);

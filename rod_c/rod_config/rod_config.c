@@ -10,6 +10,12 @@
 /* ******************************************************* Includes ****************************************************** */
 
 #include "rod_config.h"
+#include <time.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <string.h>
+#include <stdio.h>
 
 /* ******************************************* Public callback functions declarations ************************************ */
 
@@ -90,4 +96,79 @@ const float* rod_config_get_distortion_coeffs(void) {
         -0.1203345, 0.06802544, -0.13779641, 0.08243704
     };
     return dist_coeffs;
+}
+
+int rod_config_create_directory_recursive(const char* path) {
+    char tmp[512];
+    struct stat st;
+    
+    // Check if directory already exists
+    if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
+        return 0;  // Already exists
+    }
+    
+    snprintf(tmp, sizeof(tmp), "%s", path);
+    
+    for (char* p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            if (stat(tmp, &st) != 0) {
+                if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+                    fprintf(stderr, "Failed to create directory %s: %s\n", tmp, strerror(errno));
+                    return -1;
+                }
+            }
+            *p = '/';
+        }
+    }
+    
+    // Create final directory
+    if (stat(tmp, &st) != 0) {
+        if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+            fprintf(stderr, "Failed to create directory %s: %s\n", tmp, strerror(errno));
+            return -1;
+        }
+    }
+    
+    return 0;
+}
+
+void rod_config_generate_date_folder(char* buffer, size_t buffer_size) {
+    time_t now = time(NULL);
+    struct tm* tm_info = localtime(&now);
+    
+    // Generate date folder: YYYY_MM_DD
+    snprintf(buffer, buffer_size, "%04d_%02d_%02d",
+             tm_info->tm_year + 1900,
+             tm_info->tm_mon + 1,
+             tm_info->tm_mday);
+}
+
+void rod_config_generate_filename_timestamp(char* buffer, size_t buffer_size) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    
+    struct tm* tm_info = localtime(&tv.tv_sec);
+    int milliseconds = tv.tv_usec / 1000;
+    
+    // Generate timestamp: YYYYMMDD_HHMMSS_MS
+    snprintf(buffer, buffer_size, "%04d%02d%02d_%02d%02d%02d_%03d",
+             tm_info->tm_year + 1900,
+             tm_info->tm_mon + 1,
+             tm_info->tm_mday,
+             tm_info->tm_hour,
+             tm_info->tm_min,
+             tm_info->tm_sec,
+             milliseconds);
+}
+
+int rod_config_ensure_date_folder(const char* base_folder, char* date_subfolder, size_t buffer_size) {
+    char date_name[16];
+    rod_config_generate_date_folder(date_name, sizeof(date_name));
+    
+    // Build full path: base_folder/YYYY_MM_DD
+    snprintf(date_subfolder, buffer_size, "%s/%s", base_folder, date_name);
+    
+    // Ensure the folder exists
+    return rod_config_create_directory_recursive(date_subfolder);
 }

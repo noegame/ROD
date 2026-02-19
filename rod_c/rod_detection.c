@@ -34,8 +34,11 @@
 // Default image folder path for emulated camera
 #define DEFAULT_IMAGE_FOLDER ROD_DEFAULT_IMAGE_FOLDER
 
-// Debug image output folder
-#define DEBUG_OUTPUT_FOLDER ROD_DEBUG_OUTPUT_FOLDER "/rod_detection"
+// Debug image output base folder
+#define DEBUG_BASE_FOLDER ROD_DEBUG_BASE_FOLDER
+
+// Camera pictures base folder
+#define PICTURES_BASE_FOLDER ROD_PICTURES_BASE_FOLDER
 
 // Socket configuration
 #define SOCKET_PATH ROD_SOCKET_PATH
@@ -380,51 +383,53 @@ int main(int argc, char* argv[]) {
                 rod_socket_server_send_detections(ctx.socket_server, markers, valid_count);
             }
             
-            // Save debug images periodically (original, annotated, masked)
+            // Save images periodically (raw camera + debug annotated)
             if (frame_count % SAVE_DEBUG_IMAGE_INTERVAL == 0) {
                 // Generate timestamp for filenames
                 char timestamp[32];
-                rod_viz_generate_timestamp(timestamp, sizeof(timestamp));
+                rod_config_generate_filename_timestamp(timestamp, sizeof(timestamp));
                 
-                // 1. Save original image
-                char filename_original[512];
-                snprintf(filename_original, sizeof(filename_original), "%s/%s_original.png", DEBUG_OUTPUT_FOLDER, timestamp);
-                save_image(filename_original, original_image);
-                
-                // 2. Save annotated image (create copy, annotate, save)
-                int img_width = get_image_width(original_image);
-                int img_height = get_image_height(original_image);
-                int img_channels = get_image_channels(original_image);
-                uint8_t* img_data = get_image_data(original_image);
-                size_t img_data_size = get_image_data_size(original_image);
-                
-                if (img_data && img_data_size > 0) {
-                    uint8_t* data_copy = (uint8_t*)malloc(img_data_size);
-                    if (data_copy) {
-                        memcpy(data_copy, img_data, img_data_size);
-                        ImageHandle* annotated = create_image_from_buffer(data_copy, img_width, img_height, img_channels, 0);
-                        free(data_copy);
-                        
-                        if (annotated) {
-                            MarkerCounts marker_counts = count_markers_by_category(markers, valid_count);
-                            rod_viz_annotate_with_counter(annotated, marker_counts);
-                            rod_viz_annotate_with_ids(annotated, markers, valid_count);
-                            rod_viz_annotate_with_centers(annotated, markers, valid_count);
+                // Ensure date folders exist
+                char pictures_date_folder[256];
+                char debug_date_folder[256];
+                if (rod_config_ensure_date_folder(PICTURES_BASE_FOLDER, pictures_date_folder, sizeof(pictures_date_folder)) == 0 &&
+                    rod_config_ensure_date_folder(DEBUG_BASE_FOLDER, debug_date_folder, sizeof(debug_date_folder)) == 0) {
+                    
+                    // 1. Save raw camera image: /var/roboteseo/pictures/YYYY_MM_DD/YYYYMMDD_HHMMSS_MS.png
+                    char filename_camera[512];
+                    snprintf(filename_camera, sizeof(filename_camera), "%s/%s.png", pictures_date_folder, timestamp);
+                    save_image(filename_camera, original_image);
+                    
+                    // 2. Save annotated debug image: /var/roboteseo/pictures/debug/YYYY_MM_DD/YYYYMMDD_HHMMSS_MS_debug.png
+                    int img_width = get_image_width(original_image);
+                    int img_height = get_image_height(original_image);
+                    int img_channels = get_image_channels(original_image);
+                    uint8_t* img_data = get_image_data(original_image);
+                    size_t img_data_size = get_image_data_size(original_image);
+                    
+                    if (img_data && img_data_size > 0) {
+                        uint8_t* data_copy = (uint8_t*)malloc(img_data_size);
+                        if (data_copy) {
+                            memcpy(data_copy, img_data, img_data_size);
+                            ImageHandle* annotated = create_image_from_buffer(data_copy, img_width, img_height, img_channels, 0);
+                            free(data_copy);
                             
-                            char filename_annotated[512];
-                            snprintf(filename_annotated, sizeof(filename_annotated), "%s/%s_annotated.png", DEBUG_OUTPUT_FOLDER, timestamp);
-                            save_image(filename_annotated, annotated);
-                            release_image(annotated);
+                            if (annotated) {
+                                MarkerCounts marker_counts = count_markers_by_category(markers, valid_count);
+                                rod_viz_annotate_with_counter(annotated, marker_counts);
+                                rod_viz_annotate_with_ids(annotated, markers, valid_count);
+                                rod_viz_annotate_with_centers(annotated, markers, valid_count);
+                                
+                                char filename_debug[512];
+                                snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.png", debug_date_folder, timestamp);
+                                save_image(filename_debug, annotated);
+                                release_image(annotated);
+                            }
                         }
                     }
+                    
+                    printf("Images saved: %s.png and %s_debug.png (markers: %d)\n", timestamp, timestamp, valid_count);
                 }
-                
-                // 3. Save masked/preprocessed image
-                char filename_masked[512];
-                snprintf(filename_masked, sizeof(filename_masked), "%s/%s_masked.png", DEBUG_OUTPUT_FOLDER, timestamp);
-                save_image(filename_masked, masked_image);
-                
-                printf("Debug images saved: %s_*.png (markers: %d)\n", timestamp, valid_count);
             }
             
             releaseDetectionResult(detection);
@@ -434,20 +439,29 @@ int main(int argc, char* argv[]) {
                 printf("Frame %d: No markers detected\n", frame_count);
             }
             
-            // Save debug images periodically even when no markers detected
+            // Save images periodically even when no markers detected
             if (frame_count % SAVE_DEBUG_IMAGE_INTERVAL == 0) {
                 char timestamp[32];
-                rod_viz_generate_timestamp(timestamp, sizeof(timestamp));
+                rod_config_generate_filename_timestamp(timestamp, sizeof(timestamp));
                 
-                char filename_original[512];
-                snprintf(filename_original, sizeof(filename_original), "%s/%s_original.png", DEBUG_OUTPUT_FOLDER, timestamp);
-                save_image(filename_original, original_image);
-                
-                char filename_masked[512];
-                snprintf(filename_masked, sizeof(filename_masked), "%s/%s_masked.png", DEBUG_OUTPUT_FOLDER, timestamp);
-                save_image(filename_masked, masked_image);
-                
-                printf("Debug images saved: %s_*.png (no markers)\n", timestamp);
+                // Ensure date folders exist
+                char pictures_date_folder[256];
+                char debug_date_folder[256];
+                if (rod_config_ensure_date_folder(PICTURES_BASE_FOLDER, pictures_date_folder, sizeof(pictures_date_folder)) == 0 &&
+                    rod_config_ensure_date_folder(DEBUG_BASE_FOLDER, debug_date_folder, sizeof(debug_date_folder)) == 0) {
+                    
+                    // Save raw camera image
+                    char filename_camera[512];
+                    snprintf(filename_camera, sizeof(filename_camera), "%s/%s.png", pictures_date_folder, timestamp);
+                    save_image(filename_camera, original_image);
+                    
+                    // Save debug image (no annotations, but in debug folder)
+                    char filename_debug[512];
+                    snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.png", debug_date_folder, timestamp);
+                    save_image(filename_debug, original_image);
+                    
+                    printf("Images saved: %s.png and %s_debug.png (no markers)\n", timestamp, timestamp);
+                }
             }
         }
         

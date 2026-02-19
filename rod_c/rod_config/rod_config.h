@@ -25,7 +25,8 @@
 #define ROD_MAX_DETECTION_SIZE 1024
 
 // Debug configuration
-#define ROD_DEBUG_OUTPUT_FOLDER "/var/roboteseo/pictures/debug"
+#define ROD_PICTURES_BASE_FOLDER "/var/roboteseo/pictures"
+#define ROD_DEBUG_BASE_FOLDER "/var/roboteseo/pictures/debug"
 #define ROD_SAVE_DEBUG_IMAGE_INTERVAL 1  // Save every N frames
 
 // Camera test configuration
@@ -106,6 +107,36 @@ const float* rod_config_get_camera_matrix(void);
  * @return Pointer to 4 distortion coefficients [k1, k2, k3, k4]
  */
 const float* rod_config_get_distortion_coeffs(void);
+
+/**
+ * @brief Create directory recursively (like mkdir -p)
+ * @param path Directory path to create
+ * @return 0 on success, -1 on failure
+ */
+int rod_config_create_directory_recursive(const char* path);
+
+/**
+ * @brief Generate date folder name in YYYY_MM_DD format
+ * @param buffer Buffer to store the result (min 11 bytes)
+ * @param buffer_size Size of the buffer
+ */
+void rod_config_generate_date_folder(char* buffer, size_t buffer_size);
+
+/**
+ * @brief Generate timestamp for filename in YYYYMMDD_HHMMSS_MS format
+ * @param buffer Buffer to store the result (min 21 bytes)
+ * @param buffer_size Size of the buffer
+ */
+void rod_config_generate_filename_timestamp(char* buffer, size_t buffer_size);
+
+/**
+ * @brief Ensure date-based subfolder exists
+ * @param base_folder Base folder path (e.g., "/var/roboteseo/pictures")
+ * @param date_subfolder Output buffer for the full path (min 256 bytes)
+ * @param buffer_size Size of the output buffer
+ * @return 0 on success, -1 on failure
+ */
+int rod_config_ensure_date_folder(const char* base_folder, char* date_subfolder, size_t buffer_size);
 
 #ifdef __cplusplus
 }
