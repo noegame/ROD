@@ -23,14 +23,14 @@ target_include_directories(test_aruco_detection PRIVATE
 )
 
 # ========================================
-# 2. Detection Dataset Test
+# 3. Geometric Accuracy Benchmark Test
 # ========================================
-# Tests: Detection accuracy on known images
-add_executable(test_detection_dataset
-    test_detection_dataset.c
+# Tests: Image-to-world coordinate transformation accuracy
+add_executable(test_geometric_accuracy
+    test_geometric_accuracy.c
 )
 
-target_link_libraries(test_detection_dataset
+target_link_libraries(test_geometric_accuracy
     opencv_wrapper
     rod_cv
     rod_config
@@ -38,14 +38,14 @@ target_link_libraries(test_detection_dataset
     m
 )
 
-target_include_directories(test_detection_dataset PRIVATE
+target_include_directories(test_geometric_accuracy PRIVATE
     ${CMAKE_SOURCE_DIR}/rod_cv
     ${CMAKE_SOURCE_DIR}/rod_config
     ${CMAKE_SOURCE_DIR}/rod_visualization
 )
 
 # ========================================
-# 3. Camera Interface Contract Test
+# 4. Camera Interface Contract Test
 # ========================================
 # Tests: camera.h API contract (emulated implementation)
 add_executable(test_camera_interface
@@ -63,7 +63,7 @@ target_include_directories(test_camera_interface PRIVATE
 )
 
 # ========================================
-# 4. Emulated Camera Implementation Test
+# 5. Emulated Camera Implementation Test
 # ========================================
 # Tests: emulated_camera.c specific behavior
 add_executable(test_emulated_camera_impl
@@ -132,6 +132,7 @@ endif()
 install(TARGETS 
     test_aruco_detection
     test_detection_dataset
+    test_geometric_accuracy
     test_camera_interface
     test_emulated_camera_impl
     RUNTIME DESTINATION bin
