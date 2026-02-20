@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
         releaseArucoDictionary(dictionary);
         return -1;
     }
-    release_image(masked_image);  // Free masked image
+    // Keep masked_image for annotation later (don't release it yet)
     double t_resize_end = get_time_ms();
     printf("      Resized to: %dx%d pixels (%.1fms)\n", new_width, new_height, t_resize_end - t_resize_start);
     
@@ -284,18 +284,9 @@ int main(int argc, char** argv) {
     double t_process_end = get_time_ms();
     printf("      Centers calculated (%.1fms)\n", t_process_end - t_process_start);
     
-    // Reload original image for annotation
+    // Use masked image for annotation (showing the mask effect)
     double t_reload_start = get_time_ms();
-    image = load_image(input_path);
-    if (image == NULL) {
-        fprintf(stderr, "Error: Could not reload original image\n");
-        if (centers) free(centers);
-        releaseDetectionResult(result_raw);
-        releaseArucoDetector(detector);
-        releaseDetectorParameters(params);
-        releaseArucoDictionary(dictionary);
-        return -1;
-    }
+    image = masked_image;  // Use the masked image instead of reloading original
     
     // Scale marker coordinates back to original size for annotation
     MarkerData markers_scaled[100];
@@ -307,7 +298,7 @@ int main(int argc, char** argv) {
     }
     
     double t_reload_end = get_time_ms();
-    printf("      Image reloaded (%.1fms)\n", t_reload_end - t_reload_start);
+    printf("      Using masked image for annotation (%.1fms)\n", t_reload_end - t_reload_start);
     
     // ========== STEP 7: ANNOTATE IMAGE ==========
     double t_annotate_start = get_time_ms();
