@@ -80,12 +80,11 @@ void rod_viz_annotate_with_full_info(ImageHandle* image, MarkerData* markers, in
         
         int x = (int)markers[i].x;
         int y = (int)markers[i].y;
-        double angle = markers[i].angle;  // Angle in radians
         
-        // Black outline for better visibility (rotated)
-        put_text_rotated(image, text, x, y, font_scale, black, 3, angle);
-        // Green text (rotated)
-        put_text_rotated(image, text, x, y, font_scale, green, 2, angle);
+        // Black outline for better visibility
+        put_text(image, text, x, y, font_scale, black, 3);
+        // Green text
+        put_text(image, text, x, y, font_scale, green, 2);
     }
 }
 

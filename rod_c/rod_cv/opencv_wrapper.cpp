@@ -37,7 +37,18 @@ ImageHandle* create_image_from_buffer(uint8_t* data, int width, int height, int 
     
     // Create Mat from buffer (makes a copy of the data)
     cv::Mat* image = new cv::Mat(height, width, cv_type);
-    memcpy(image->data, data, width * height * channels);
+    
+    // Copy data properly handling potential stride/padding
+    if (image->isContinuous()) {
+        // Single memcpy if image is continuous (no padding)
+        memcpy(image->data, data, width * height * channels);
+    } else {
+        // Copy row by row if there's padding
+        size_t row_size = width * channels;
+        for (int row = 0; row < height; row++) {
+            memcpy(image->data + row * image->step, data + row * row_size, row_size);
+        }
+    }
     
     // Convert from RGB to BGR if needed (OpenCV uses BGR by default)
     if (format == 1 && channels == 3) {  // RGB format
@@ -154,17 +165,8 @@ int save_image(const char* path, ImageHandle* handle) {
         }
     }
     
-    // Convert BGR to RGB for better readability in image viewers
-    cv::Mat rgb_image;
-    if (image->channels() == 3) {
-        cv::cvtColor(*image, rgb_image, cv::COLOR_BGR2RGB);
-    } else {
-        // Grayscale or RGBA - no conversion needed
-        rgb_image = *image;
-    }
-    
-    // Try to save the RGB image with compression parameters
-    bool success = cv::imwrite(path, rgb_image, compression_params);
+    // Save image directly without conversion (OpenCV uses BGR internally)
+    bool success = cv::imwrite(path, *image, compression_params);
     if (!success) {
         fprintf(stderr, "save_image: cv::imwrite failed for path %s\n", path);
     }
