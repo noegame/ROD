@@ -132,7 +132,7 @@ static int init_app_context(AppContext* ctx, CameraType camera_type, const char*
     
     // Initialize camera based on type
     printf("Initializing %s camera...\n", 
-           camera_type == CAMERA_TYPE_IMX477 ? "real" : "emulated");
+           camera_type == CAMERA_TYPE_EMULATED ? "emulated" : "real");
     ctx->camera = camera_create(camera_type);
     if (!ctx->camera) {
         fprintf(stderr, "Failed to initialize camera\n");
