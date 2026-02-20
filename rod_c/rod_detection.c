@@ -486,6 +486,13 @@ int main(int argc, char* argv[]) {
                                 rod_viz_annotate_with_ids(annotated, markers, valid_count);
                                 rod_viz_annotate_with_centers(annotated, markers, valid_count);
                                 
+                                // Convert BGR to RGB for output
+                                ImageHandle* annotated_rgb = convert_bgr_to_rgb(annotated);
+                                if (annotated_rgb) {
+                                    release_image(annotated);
+                                    annotated = annotated_rgb;
+                                }
+                                
                                 char filename_debug[512];
                                 snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.jpg", debug_date_folder, timestamp);
                                 save_image(filename_debug, annotated);
@@ -546,10 +553,14 @@ int main(int argc, char* argv[]) {
                     snprintf(filename_camera, sizeof(filename_camera), "%s/%s.jpg", pictures_date_folder, timestamp);
                     save_image(filename_camera, original_image);
                     
-                    // Save debug image (no annotations, but in debug folder)
-                    char filename_debug[512];
-                    snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.jpg", debug_date_folder, timestamp);
-                    save_image(filename_debug, original_image);
+                    // Save debug image (no annotations, but in debug folder) in RGB format
+                    ImageHandle* debug_rgb = convert_bgr_to_rgb(original_image);
+                    if (debug_rgb) {
+                        char filename_debug[512];
+                        snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.jpg", debug_date_folder, timestamp);
+                        save_image(filename_debug, debug_rgb);
+                        release_image(debug_rgb);
+                    }
                     
                     printf("Images saved: %s.jpg and %s_debug.jpg (no markers)\n", timestamp, timestamp);
                 }
