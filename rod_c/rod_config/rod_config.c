@@ -47,6 +47,25 @@ MarkerCategory rod_config_get_marker_category(int id) {
     }
 }
 
+float rod_config_get_marker_size(int id) {
+    // Marker sizes according to Eurobot 2026 rules
+    // See docs/general-eurobot-rules.md and docs/2026-eurobot-rules.md
+    
+    if (id >= 20 && id <= 23) {
+        // Fixed field markers: 100mm x 100mm
+        return 100.0f;
+    } else if (id >= 1 && id <= 10) {
+        // Robot markers (both blue and yellow): 70mm x 70mm
+        return 70.0f;
+    } else if (id == 36 || id == 41 || id == 47) {
+        // Game element markers (blue box, empty box, yellow box): 40mm x 40mm
+        return 40.0f;
+    }
+    
+    // Invalid marker ID
+    return 0.0f;
+}
+
 void rod_config_configure_detector_parameters(DetectorParametersHandle* params) {
     // Adaptive thresholding parameters
     // These values are CRITICAL - validated through extensive testing

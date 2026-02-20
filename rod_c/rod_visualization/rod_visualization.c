@@ -27,7 +27,7 @@
 
 /* ********************************************* Function implementations *********************************************** */
 
-void rod_viz_annotate_with_ids(ImageHandle* image, MarkerData* markers, int count) {
+void rod_viz_annotate_with_ids(ImageHandle* image, MarkerData* markers, int count, DetectionResult* detection) {
     Color black = {0, 0, 0};
     Color green = {0, 255, 0};
     double font_scale = 0.5;
@@ -36,8 +36,26 @@ void rod_viz_annotate_with_ids(ImageHandle* image, MarkerData* markers, int coun
         char text[32];
         snprintf(text, sizeof(text), "ID:%d", markers[i].id);
         
-        int x = (int)markers[i].x;
+        // Find corresponding marker in detection to get pixel coordinates
+        int x = (int)markers[i].x;  // Default to terrain coords
         int y = (int)markers[i].y;
+        
+        if (detection) {
+            for (int j = 0; j < detection->count; j++) {
+                if (detection->markers[j].id == markers[i].id) {
+                    // Calculate center from corners in pixels
+                    float corners[4][2];
+                    for (int k = 0; k < 4; k++) {
+                        corners[k][0] = detection->markers[j].corners[k][0];
+                        corners[k][1] = detection->markers[j].corners[k][1];
+                    }
+                    Point2f center = calculate_marker_center(corners);
+                    x = (int)center.x;
+                    y = (int)center.y;
+                    break;
+                }
+            }
+        }
         
         // Black outline for better visibility
         put_text(image, text, x, y, font_scale, black, 3);
@@ -46,17 +64,36 @@ void rod_viz_annotate_with_ids(ImageHandle* image, MarkerData* markers, int coun
     }
 }
 
-void rod_viz_annotate_with_centers(ImageHandle* image, MarkerData* markers, int count) {
+void rod_viz_annotate_with_centers(ImageHandle* image, MarkerData* markers, int count, DetectionResult* detection) {
     Color black = {0, 0, 0};
     Color blue = {255, 0, 0};  // OpenCV uses BGR
     double font_scale = 0.5;
     
     for (int i = 0; i < count; i++) {
         char text[64];
-        snprintf(text, sizeof(text), "(%d,%d)", (int)markers[i].x, (int)markers[i].y);
+        // Display terrain coordinates in mm
+        snprintf(text, sizeof(text), "(%dmm,%dmm)", (int)markers[i].x, (int)markers[i].y);
         
-        int x = (int)markers[i].x;
+        // Find corresponding marker in detection to get pixel coordinates for text positioning
+        int x = (int)markers[i].x;  // Default fallback
         int y = (int)markers[i].y - 20;  // Position above the marker
+        
+        if (detection) {
+            for (int j = 0; j < detection->count; j++) {
+                if (detection->markers[j].id == markers[i].id) {
+                    // Calculate center from corners in pixels
+                    float corners[4][2];
+                    for (int k = 0; k < 4; k++) {
+                        corners[k][0] = detection->markers[j].corners[k][0];
+                        corners[k][1] = detection->markers[j].corners[k][1];
+                    }
+                    Point2f center = calculate_marker_center(corners);
+                    x = (int)center.x;
+                    y = (int)center.y - 20;  // Position above the marker
+                    break;
+                }
+            }
+        }
         
         // Black outline for better visibility
         put_text(image, text, x, y, font_scale, black, 3);

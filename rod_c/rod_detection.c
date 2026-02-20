@@ -410,20 +410,14 @@ int main(int argc, char* argv[]) {
         double t_mask_end = get_time_ms();
         
         // Step 4: Resize image (1.5x scale) for better detection of small/distant markers (reuse buffer)
-        // double t_resize_start = get_time_ms();
+        double t_resize_start = get_time_ms();
+        // Resizing disabled for now (DETECTION_SCALE_FACTOR = 1.0)
         // int new_width = (int)(width * DETECTION_SCALE_FACTOR);
         // int new_height = (int)(height * DETECTION_SCALE_FACTOR);
         // ctx.buffer_resized = resize_image_reuse(masked_image, new_width, new_height, ctx.buffer_resized);
         
-        // double t_resize_end = get_time_ms();
-        // if (!ctx.buffer_resized) {
-        //     fprintf(stderr, "Failed to resize image\n");
-        //     release_image(original_image);
-        //     usleep(10000);
-        //     continue;
-        // }
-
         ctx.buffer_resized = masked_image;  // No resizing for now (keep original size for detection)
+        double t_resize_end = get_time_ms();
         
         // Step 5: Detect ArUco markers on preprocessed image
         double t_detect_start = get_time_ms();
@@ -432,7 +426,6 @@ int main(int argc, char* argv[]) {
         double t_detect_end = get_time_ms();
         
         // Step 6: Scale coordinates back to original image size
-        double t_process_start = get_time_ms();
         if (detection && detection->count > 0) {
             for (int i = 0; i < detection->count; i++) {
                 for (int j = 0; j < 4; j++) {
@@ -443,9 +436,13 @@ int main(int argc, char* argv[]) {
         }
         
         if (detection && detection->count > 0) {
-            // Filter and process detected markers using rod_cv module
+            // Localize markers in playground coordinates using SolvePnP + transformation
+            double t_pose_start = get_time_ms();
             MarkerData markers[100];  // Max 100 markers
-            int valid_count = filter_valid_markers(detection, markers, 100);
+            const float* K = rod_config_get_camera_matrix();
+            const float* D = rod_config_get_distortion_coeffs();
+            int valid_count = localize_markers_in_playground(detection, markers, 100, K, D);
+            double t_pose_end = get_time_ms();
             
             // Count markers by category for reporting
             MarkerCounts marker_counts = count_markers_by_category(markers, valid_count);
@@ -490,8 +487,8 @@ int main(int argc, char* argv[]) {
                                 t_annotate_start = get_time_ms();
                                 rod_viz_annotate_with_colored_quadrilaterals(annotated, detection);
                                 rod_viz_annotate_with_counter(annotated, marker_counts);
-                                rod_viz_annotate_with_ids(annotated, markers, valid_count);
-                                rod_viz_annotate_with_centers(annotated, markers, valid_count);
+                                rod_viz_annotate_with_ids(annotated, markers, valid_count, detection);
+                                rod_viz_annotate_with_centers(annotated, markers, valid_count, detection);
                                 t_annotate_end = get_time_ms();
                                 
                                 // Convert BGR to RGB for output
@@ -533,7 +530,8 @@ int main(int argc, char* argv[]) {
             printf("Mask: %.1fms\n", t_mask_end - t_mask_start);
             printf("Resize: %.1fms\n", t_resize_end - t_resize_start);
             printf("Detect: %.1fms\n", t_detect_end - t_detect_start);
-            printf("Process: %.1fms\n", t_send_end - t_process_start);
+            printf("Pose: %.1fms\n", t_pose_end - t_pose_start);
+            printf("Process: %.1fms\n", t_send_end - t_pose_end);
             printf("Reload: 0.0ms\n");  // Buffers are reused, no reload
             printf("Annotate: %.1fms\n", t_annotate_end - t_annotate_start);
             printf("Save: %.1fms\n", t_save_end - t_save_start);
@@ -560,6 +558,7 @@ int main(int argc, char* argv[]) {
                 printf("Mask: %.1fms\n", t_mask_end - t_mask_start);
                 printf("Resize: %.1fms\n", t_resize_end - t_resize_start);
                 printf("Detect: %.1fms\n", t_detect_end - t_detect_start);
+                printf("Pose: 0.0ms\n");  // No pose estimation when no markers
                 printf("Process: 0.0ms\n");  // No processing when no markers
                 printf("Reload: 0.0ms\n");
                 printf("Annotate: 0.0ms\n");

@@ -28,22 +28,25 @@
 /**
  * @brief Annotate image with marker IDs at marker centers
  * @param image Image handle (will be modified in place)
- * @param markers Array of marker data
+ * @param markers Array of marker data (contains terrain coordinates in mm)
  * @param count Number of markers
+ * @param detection Original detection result (contains pixel coordinates for positioning)
  * 
- * Draws green text with black outline showing "ID:XX" at each marker center
+ * Draws green text with black outline showing "ID:XX" at each marker center (in pixels)
  */
-void rod_viz_annotate_with_ids(ImageHandle* image, MarkerData* markers, int count);
+void rod_viz_annotate_with_ids(ImageHandle* image, MarkerData* markers, int count, DetectionResult* detection);
 
 /**
- * @brief Annotate image with marker center coordinates
+ * @brief Annotate image with marker center coordinates in terrain frame
  * @param image Image handle (will be modified in place)
- * @param markers Array of marker data
+ * @param markers Array of marker data (contains terrain coordinates in mm)
  * @param count Number of markers
+ * @param detection Original detection result (contains pixel coordinates for positioning)
  * 
- * Draws blue text with black outline showing "(x,y)" above each marker
+ * Draws blue text with black outline showing "(x,y)mm" above each marker
+ * Note: Displayed coordinates are in playground frame (mm)
  */
-void rod_viz_annotate_with_centers(ImageHandle* image, MarkerData* markers, int count);
+void rod_viz_annotate_with_centers(ImageHandle* image, MarkerData* markers, int count, DetectionResult* detection);
 
 /**
  * @brief Annotate image with complete marker info (ID, coordinates, angle)

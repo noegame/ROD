@@ -151,6 +151,257 @@ MarkerCounts count_markers_by_category(MarkerData* markers, int count) {
     return counts;
 }
 
+PnPResult estimate_marker_pose_camera_frame(float corners[4][2], 
+                                             float marker_size,
+                                             const float* camera_matrix,
+                                             const float* dist_coeffs) {
+    // Define 3D points of marker corners in marker's local coordinate system
+    // Corner order matches OpenCV ArUco detection (top-left, top-right, bottom-right, bottom-left)
+    float half_size = marker_size / 2.0f;
+    Point3f object_points[4] = {
+        {-half_size, half_size, 0.0f},   // Top-left
+        {half_size, half_size, 0.0f},    // Top-right
+        {half_size, -half_size, 0.0f},   // Bottom-right
+        {-half_size, -half_size, 0.0f}   // Bottom-left
+    };
+    
+    // Convert corners to Point2f array
+    Point2f image_points[4];
+    for (int i = 0; i < 4; i++) {
+        image_points[i].x = corners[i][0];
+        image_points[i].y = corners[i][1];
+    }
+    
+    // Call OpenCV wrapper's solve_pnp
+    return solve_pnp(object_points, image_points, 4, 
+                     (float*)camera_matrix, (float*)dist_coeffs);
+}
+
+int compute_camera_to_playground_transform(DetectionResult* detection,
+                                           const float* camera_matrix,
+                                           const float* dist_coeffs,
+                                           float marker_size,
+                                           float* transform_matrix) {
+    if (!detection || !transform_matrix) {
+        return -1;
+    }
+    
+    // Known playground positions of fixed markers (in mm)
+    // ID -> (x, y, z) in playground frame
+    float fixed_markers_playground[4][4] = {
+        {20, 600, 600, 30},      // ID 20
+        {21, 600, 2400, 30},     // ID 21
+        {22, 1400, 600, 30},     // ID 22
+        {23, 1400, 2400, 30}     // ID 23
+    };
+    
+    // Find fixed markers and get their camera frame positions
+    Point3f camera_points[4];
+    Point3f playground_points[4];
+    int found_count = 0;
+    
+    for (int i = 0; i < detection->count && found_count < 4; i++) {
+        int marker_id = detection->markers[i].id;
+        
+        // Check if this is a fixed marker
+        for (int j = 0; j < 4; j++) {
+            if (marker_id == (int)fixed_markers_playground[j][0]) {
+                // Estimate pose in camera frame
+                PnPResult pose = estimate_marker_pose_camera_frame(
+                    detection->markers[i].corners,
+                    marker_size,
+                    camera_matrix,
+                    dist_coeffs
+                );
+                
+                if (pose.success) {
+                    // Store camera frame position (tvec is the marker center in camera frame)
+                    camera_points[found_count].x = pose.tvec[0];
+                    camera_points[found_count].y = pose.tvec[1];
+                    camera_points[found_count].z = pose.tvec[2];
+                    
+                    // Store corresponding playground position
+                    playground_points[found_count].x = fixed_markers_playground[j][1];
+                    playground_points[found_count].y = fixed_markers_playground[j][2];
+                    playground_points[found_count].z = fixed_markers_playground[j][3];
+                    
+                    found_count++;
+                }
+                break;
+            }
+        }
+    }
+    
+    if (found_count < 4) {
+        fprintf(stderr, "compute_camera_to_playground_transform: only %d/4 fixed markers found\n", found_count);
+        return -1;
+    }
+    
+    // Compute centroids
+    Point3f camera_centroid = {0, 0, 0};
+    Point3f playground_centroid = {0, 0, 0};
+    for (int i = 0; i < 4; i++) {
+        camera_centroid.x += camera_points[i].x;
+        camera_centroid.y += camera_points[i].y;
+        camera_centroid.z += camera_points[i].z;
+        playground_centroid.x += playground_points[i].x;
+        playground_centroid.y += playground_points[i].y;
+        playground_centroid.z += playground_points[i].z;
+    }
+    camera_centroid.x /= 4.0f;
+    camera_centroid.y /= 4.0f;
+    camera_centroid.z /= 4.0f;
+    playground_centroid.x /= 4.0f;
+    playground_centroid.y /= 4.0f;
+    playground_centroid.z /= 4.0f;
+    
+    // Compute covariance matrix H = sum((p_playground - centroid_playground) * (p_camera - centroid_camera)^T)
+    float H[3][3] = {{0}};
+    for (int i = 0; i < 4; i++) {
+        float dp_x = playground_points[i].x - playground_centroid.x;
+        float dp_y = playground_points[i].y - playground_centroid.y;
+        float dp_z = playground_points[i].z - playground_centroid.z;
+        
+        float dc_x = camera_points[i].x - camera_centroid.x;
+        float dc_y = camera_points[i].y - camera_centroid.y;
+        float dc_z = camera_points[i].z - camera_centroid.z;
+        
+        H[0][0] += dp_x * dc_x;
+        H[0][1] += dp_x * dc_y;
+        H[0][2] += dp_x * dc_z;
+        H[1][0] += dp_y * dc_x;
+        H[1][1] += dp_y * dc_y;
+        H[1][2] += dp_y * dc_z;
+        H[2][0] += dp_z * dc_x;
+        H[2][1] += dp_z * dc_y;
+        H[2][2] += dp_z * dc_z;
+    }
+    
+    // Simplified rotation estimation (using approximation for small rotations)
+    // For a more robust solution, SVD should be used, but that requires additional libraries
+    // This approximation works well when camera is roughly aligned with playground
+    
+    // Build 4x4 transformation matrix [R | t; 0 0 0 1]
+    // For simplicity, we'll use a scale + translation approach
+    // R is approximated as identity (assumes camera Z-axis roughly parallel to playground plane)
+    float scale = 1.0f;
+    
+    // Initialize as identity matrix
+    for (int i = 0; i < 16; i++) {
+        transform_matrix[i] = 0.0f;
+    }
+    transform_matrix[0] = scale;   // R[0][0]
+    transform_matrix[5] = scale;   // R[1][1]
+    transform_matrix[10] = scale;  // R[2][2]
+    transform_matrix[15] = 1.0f;   // Homogeneous coordinate
+    
+    // Translation: t = playground_centroid - R * camera_centroid
+    transform_matrix[3] = playground_centroid.x - scale * camera_centroid.x;   // tx
+    transform_matrix[7] = playground_centroid.y - scale * camera_centroid.y;   // ty
+    transform_matrix[11] = playground_centroid.z - scale * camera_centroid.z;  // tz
+    
+    return 0;
+}
+
+void transform_camera_to_playground(const float* camera_point,
+                                    const float* transform_matrix,
+                                    float* playground_point) {
+    // Apply 4x4 transformation: p_playground = T * p_camera
+    // T is in column-major order: [R | t]
+    //                              [0   1]
+    
+    playground_point[0] = transform_matrix[0] * camera_point[0] +
+                          transform_matrix[1] * camera_point[1] +
+                          transform_matrix[2] * camera_point[2] +
+                          transform_matrix[3];
+    
+    playground_point[1] = transform_matrix[4] * camera_point[0] +
+                          transform_matrix[5] * camera_point[1] +
+                          transform_matrix[6] * camera_point[2] +
+                          transform_matrix[7];
+    
+    playground_point[2] = transform_matrix[8] * camera_point[0] +
+                          transform_matrix[9] * camera_point[1] +
+                          transform_matrix[10] * camera_point[2] +
+                          transform_matrix[11];
+}
+
+int localize_markers_in_playground(DetectionResult* detection,
+                                   MarkerData* markers,
+                                   int max_markers,
+                                   const float* camera_matrix,
+                                   const float* dist_coeffs) {
+    if (!detection || !markers || max_markers <= 0) {
+        return -1;
+    }
+    
+    // Step 1: Compute camera-to-playground transformation
+    // Fixed markers are always 100mm
+    float transform_matrix[16];
+    if (compute_camera_to_playground_transform(detection, camera_matrix, dist_coeffs, 
+                                               100.0f, transform_matrix) != 0) {
+        // Fallback to pixel coordinates if transformation fails
+        return filter_valid_markers(detection, markers, max_markers);
+    }
+    
+    // Step 2: For each valid marker, estimate pose and transform to playground frame
+    int valid_count = 0;
+    
+    for (int i = 0; i < detection->count && valid_count < max_markers; i++) {
+        DetectedMarker* marker = &detection->markers[i];
+        
+        // Only process valid marker IDs
+        if (!rod_config_is_valid_marker_id(marker->id)) {
+            continue;
+        }
+        
+        // Get marker size based on ID (100mm for fixed, 70mm for robots, 40mm for game elements)
+        float marker_size = rod_config_get_marker_size(marker->id);
+        if (marker_size == 0.0f) {
+            // Invalid marker, skip
+            continue;
+        }
+        
+        // Estimate pose in camera frame
+        PnPResult pose = estimate_marker_pose_camera_frame(
+            marker->corners,
+            marker_size,
+            camera_matrix,
+            dist_coeffs
+        );
+        
+        if (!pose.success) {
+            // Fallback to pixel coordinates if pose estimation fails
+            Point2f center = calculate_marker_center(marker->corners);
+            float angle = calculate_marker_angle(marker->corners);
+            markers[valid_count].id = marker->id;
+            markers[valid_count].x = center.x;
+            markers[valid_count].y = center.y;
+            markers[valid_count].angle = angle;
+            valid_count++;
+            continue;
+        }
+        
+        // Transform from camera frame to playground frame
+        float camera_point[3] = {pose.tvec[0], pose.tvec[1], pose.tvec[2]};
+        float playground_point[3];
+        transform_camera_to_playground(camera_point, transform_matrix, playground_point);
+        
+        // Calculate angle (rotation around Z-axis)
+        // Extract yaw from rotation vector (simplified - assumes small rotations)
+        float angle = calculate_marker_angle(marker->corners);  // Use 2D angle for now
+        
+        // Store marker data with playground coordinates
+        markers[valid_count].id = marker->id;
+        markers[valid_count].x = playground_point[0];  // X in mm
+        markers[valid_count].y = playground_point[1];  // Y in mm
+        markers[valid_count].angle = angle;
+        valid_count++;
+    }
+    
+    return valid_count;
+}
+
 ImageHandle* create_field_mask_from_image(ImageHandle* image,
                                            ArucoDetectorHandle* detector,
                                            int output_width, 
@@ -161,9 +412,6 @@ ImageHandle* create_field_mask_from_image(ImageHandle* image,
         fprintf(stderr, "create_field_mask_from_image: invalid parameters\n");
         return NULL;
     }
-    
-    int img_width = get_image_width(image);
-    int img_height = get_image_height(image);
     
     // Detect ArUco tags
     DetectionResult* detection = detectMarkersWithConfidence(detector, image);

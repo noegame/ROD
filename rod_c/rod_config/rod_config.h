@@ -75,6 +75,18 @@ int rod_config_is_valid_marker_id(int id);
 MarkerCategory rod_config_get_marker_category(int id);
 
 /**
+ * @brief Get the physical size of a marker in mm according to Eurobot rules
+ * @param id Marker ID
+ * @return Marker size in mm, or 0.0f if invalid ID
+ * 
+ * Marker sizes according to Eurobot 2026:
+ * - Fixed markers (20-23): 100mm x 100mm
+ * - Robot markers (1-10): 70mm x 70mm
+ * - Game element markers (36, 41, 47): 40mm x 40mm
+ */
+float rod_config_get_marker_size(int id);
+
+/**
  * @brief Configure ArUco detector with optimized parameters for Eurobot 2026
  * @param params Detector parameters handle
  * 

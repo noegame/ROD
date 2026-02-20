@@ -132,12 +132,72 @@ int filter_valid_markers(DetectionResult* result, MarkerData* filtered_markers, 
 MarkerCounts count_markers_by_category(MarkerData* markers, int count);
 
 /**
- * @brief Pose estimation of aruco marker in a picture
- * @param image Image handle
- * @param marker_handle Marker handle containing marker ID and corners
- * @note This is a placeholder for future 3D pose estimation implementation
+ * @brief Estimate 3D pose of a marker using SolvePnP
+ * @param corners Array of 4 corner points [x,y] in image coordinates
+ * @param marker_size Size of the marker in mm (default 100mm)
+ * @param camera_matrix Camera intrinsic matrix (3x3)
+ * @param dist_coeffs Distortion coefficients (4 elements for fisheye)
+ * @return PnPResult containing rvec, tvec, and success flag
  */
-// void estimate_marker_pose(ImageHandle* image, MarkerHandle* marker_handle);
+PnPResult estimate_marker_pose_camera_frame(float corners[4][2], 
+                                             float marker_size,
+                                             const float* camera_matrix,
+                                             const float* dist_coeffs);
+
+/**
+ * @brief Compute transformation matrix from camera frame to playground frame
+ * @param detection Detection result containing all markers
+ * @param camera_matrix Camera intrinsic matrix (3x3)
+ * @param dist_coeffs Distortion coefficients (4 elements)
+ * @param marker_size Size of markers in mm
+ * @param transform_matrix Output 4x4 transformation matrix (rotation + translation)
+ * @return 0 on success, -1 if not enough fixed markers found
+ * 
+ * This function:
+ * 1. Finds the 4 fixed markers (IDs 20, 21, 22, 23) in the detection
+ * 2. Computes their 3D positions in camera frame using SolvePnP
+ * 3. Uses known playground positions to compute transformation matrix
+ */
+int compute_camera_to_playground_transform(DetectionResult* detection,
+                                           const float* camera_matrix,
+                                           const float* dist_coeffs,
+                                           float marker_size,
+                                           float* transform_matrix);
+
+/**
+ * @brief Transform a 3D point from camera frame to playground frame
+ * @param camera_point Point in camera frame (x, y, z)
+ * @param transform_matrix 4x4 transformation matrix
+ * @param playground_point Output point in playground frame (x, y, z)
+ */
+void transform_camera_to_playground(const float* camera_point,
+                                    const float* transform_matrix,
+                                    float* playground_point);
+
+/**
+ * @brief Convert detection results from pixel coordinates to playground coordinates
+ * @param detection Detection result with pixel coordinates
+ * @param markers Output array of markers with playground coordinates (x,y in mm, z from tvec)
+ * @param max_markers Maximum number of markers to process
+ * @param camera_matrix Camera intrinsic matrix
+ * @param dist_coeffs Distortion coefficients
+ * @return Number of markers successfully localized, -1 on error
+ * 
+ * This function:
+ * 1. Computes camera-to-playground transformation using fixed markers (100mm)
+ * 2. For each valid marker, estimates pose in camera frame using correct size per ID
+ * 3. Transforms to playground coordinates
+ * 
+ * Note: Marker sizes are automatically determined from IDs:
+ * - Fixed markers (20-23): 100mm
+ * - Robot markers (1-10): 70mm  
+ * - Game elements (36,41,47): 40mm
+ */
+int localize_markers_in_playground(DetectionResult* detection,
+                                   MarkerData* markers,
+                                   int max_markers,
+                                   const float* camera_matrix,
+                                   const float* dist_coeffs);
 
 /**
  * @brief Create a mask for the playing field based on fixed markers
