@@ -410,18 +410,20 @@ int main(int argc, char* argv[]) {
         double t_mask_end = get_time_ms();
         
         // Step 4: Resize image (1.5x scale) for better detection of small/distant markers (reuse buffer)
-        double t_resize_start = get_time_ms();
-        int new_width = (int)(width * DETECTION_SCALE_FACTOR);
-        int new_height = (int)(height * DETECTION_SCALE_FACTOR);
-        ctx.buffer_resized = resize_image_reuse(masked_image, new_width, new_height, ctx.buffer_resized);
+        // double t_resize_start = get_time_ms();
+        // int new_width = (int)(width * DETECTION_SCALE_FACTOR);
+        // int new_height = (int)(height * DETECTION_SCALE_FACTOR);
+        // ctx.buffer_resized = resize_image_reuse(masked_image, new_width, new_height, ctx.buffer_resized);
         
-        double t_resize_end = get_time_ms();
-        if (!ctx.buffer_resized) {
-            fprintf(stderr, "Failed to resize image\n");
-            release_image(original_image);
-            usleep(10000);
-            continue;
-        }
+        // double t_resize_end = get_time_ms();
+        // if (!ctx.buffer_resized) {
+        //     fprintf(stderr, "Failed to resize image\n");
+        //     release_image(original_image);
+        //     usleep(10000);
+        //     continue;
+        // }
+
+        ctx.buffer_resized = masked_image;  // No resizing for now (keep original size for detection)
         
         // Step 5: Detect ArUco markers on preprocessed image
         double t_detect_start = get_time_ms();
