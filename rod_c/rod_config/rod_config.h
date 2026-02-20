@@ -33,7 +33,7 @@
 #define ROD_CAMERA_TESTS_OUTPUT_FOLDER "/var/roboteseo/pictures/camera_tests"
 
 // Default paths
-#define ROD_DEFAULT_IMAGE_FOLDER "pictures/camera/2026-01-16-playground-ready"
+#define ROD_DEFAULT_IMAGE_FOLDER "/var/roboteseo/pictures/camera/2026-01-16-playground-ready"
 
 /* ************************************************** Public types definition ******************************************** */
 
