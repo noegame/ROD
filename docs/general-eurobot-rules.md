@@ -1,19 +1,22 @@
 # Eurobot general rules
 
-## general
+## General
 
-Afin d’éviter toutes perturbations visuelles, l’utilisation par les équipes de tag ArUco 4x4 numérotés entre 0 et 50 est interdite.
+- Usage of ArUcO 4x4 tags with ID between 0 and 50 is prohibited to avoid visual disturbances.
 
-## marqueurs de robots
+## Robot markers
 
-- Tag ArUco 4x4, centré, et de 7cm de côté. Une marge blanche de 1cm de large est laissée autour du tag ArUco pour faciliter sa détection. Enfin, un contour de 0,5cm de large à la couleur de l’équipe est tracé au bord.
-- Les robots de l’équipe bleue recevront des marqueurs avec les tags ArUco 4x4 numérotés entre 1 et 5.
-- Les robots de l’équipe jaune recevront des marqueurs avec les tags ArUco 4x4 numérotés entre 6 et 10.
+- Type : ArUcO 4x4 tags
+- Blue team ID : between 1 and 5.
+- Yellow team ID :  between 6 and 10.
+- Size : 70 mm x 70 mm
 
-## marqueurs terrain 
+## Field markers 
 
-- 20,21,22,23
+- Type : ArUco 4x4 tags
+- ID : 20,21,22,23
+- Size  : 100 mm x 100 mm
 
-## marqueurs elements de jeux
+## Game element markers
 
-- Les tags ArUco 4x4 numérotés de 11 à 50 sont réservés à l’aire de jeu et à ses éléments.
+- ArUco 4x4 tags numbered from 11 to 50 are reserved for the playing field and its elements.

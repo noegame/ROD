@@ -32,7 +32,9 @@ Based on the computer vision context, solvePnP returns coordinates in the **came
 Rectangle {
     Rectangle "aruco coordinates in camera system" as Camera
     Rectangle "aruco coordinates in image system" as Image
+    Rectangle "aruco coordinates in playground system" as Playground
     Image --> Camera : SolvePnP
+   Camera --> Playground : Transformation 
 }
 @enduml
 ```

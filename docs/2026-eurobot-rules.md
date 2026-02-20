@@ -1,17 +1,13 @@
 ## Information about eurobot competition 2026 rules :
 
-### Game elements
-- aruco markers are placed on game element to identify them
-- there are 2 types of game elements : boxes and empty boxes
-- the boxes have two faces : a blue face with aruco marker 36 and a yellow face with aruco marker 47
-- the empty boxes have aruco marker 41 on both faces 
+ArUco markers are placed on game elements to identify them. 
+There are 2 types of game elements : boxes and empty boxes.
+The boxes have two faces : a blue face and a yellow.
+The empty boxes are black on both faces.
 
-
-### Arcuo ID meaning
-- 36 : blue box
-- 41 : empty box (black)
-- 47 : yellow box
-
-## Information about eurobot competition general rules : 
-- The robots from the blue team will receive markers with ArUco 4x4 tags numbered between 1 and 5
-- The robots from the yellow team will receive markers with ArUco 4x4 tags numbered between 6 and 10
+### ArUcO characteristics of game elements
+- Type : ArUco 4x4 tags
+- ID 36 : blue box
+- ID 41 : black box
+- ID 47 : yellow box
+- Size  : 40 mm x 40 mm
