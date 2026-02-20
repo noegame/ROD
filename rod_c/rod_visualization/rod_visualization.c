@@ -94,9 +94,10 @@ void rod_viz_annotate_with_colored_quadrilaterals(ImageHandle* image, DetectionR
     }
     
     // Define colors (BGR format)
-    Color blue = {255, 0, 0};    // Blue for ID 36 and 47
+    Color blue = {255, 0, 0};    // Blue for ID 36
     Color black = {0, 0, 0};     // Black for ID 41
     Color green = {0, 255, 0};   // Green for ID 20-23
+    Color yellow = {0, 255, 255};  // Yellow for ID 47
     
     int thickness = 3;
     
@@ -106,15 +107,20 @@ void rod_viz_annotate_with_colored_quadrilaterals(ImageHandle* image, DetectionR
         
         // Select color based on marker ID
         Color* color = NULL;
-        if (id == 36 || id == 47) {
+        if (id == 36) {
             // Blue box (36) and Yellow box (47) get blue outline
             color = &blue;
+        } else if (id == 47) {
+            // Yellow box (47) gets yellow outline
+            color = &yellow;
         } else if (id == 41) {
             // Empty box gets black outline
             color = &black;
         } else if (id >= 20 && id <= 23) {
             // Fixed field markers get green outline
             color = &green;
+        } else {
+            color = &green;  // Default to green for any other markers (optional)
         }
         
         // Draw quadrilateral if color was selected
