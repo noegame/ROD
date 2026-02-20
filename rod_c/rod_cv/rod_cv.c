@@ -350,9 +350,21 @@ int localize_markers_in_playground(DetectionResult* detection,
         Point2f pixel_center = calculate_marker_center(marker->corners);
         float angle = calculate_marker_angle(marker->corners);
         
-        // Transform pixel coordinates to playground coordinates using homography
+        // Undistort pixel point using fisheye model before applying homography
+        const float* K = rod_config_get_camera_matrix();
+        const float* D = rod_config_get_distortion_coeffs();
         Point2f pixel_point = {pixel_center.x, pixel_center.y};
-        Point2f* terrain_point = perspective_transform(&pixel_point, 1, (float*)homography_inv);
+        // Pass K as output matrix to keep points in pixel coordinates (like Python: undistortPoints(..., K, D, None, K))
+        Point2f* pixel_undistorted = fisheye_undistort_points(&pixel_point, 1, (float*)K, (float*)D, (float*)K);
+        
+        if (!pixel_undistorted) {
+            fprintf(stderr, "Warning: Failed to undistort point for marker ID %d\n", marker->id);
+            continue;
+        }
+        
+        // Transform undistorted pixel coordinates to playground coordinates using homography
+        Point2f* terrain_point = perspective_transform(pixel_undistorted, 1, (float*)homography_inv);
+        free_points_2f(pixel_undistorted);
         
         if (!terrain_point) {
             // Fallback: use pixel coordinates if transformation fails
