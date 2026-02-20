@@ -22,9 +22,11 @@
  */
 typedef struct {
     int id;
-    float x;
-    float y;
-    float angle;
+    float x;         // X coordinate in playground frame (mm)
+    float y;         // Y coordinate in playground frame (mm)
+    float angle;     // Rotation angle in radians
+    float pixel_x;   // X coordinate in image (pixels, for visualization)
+    float pixel_y;   // Y coordinate in image (pixels, for visualization)
 } MarkerData;
 
 /**

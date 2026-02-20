@@ -116,11 +116,13 @@ int filter_valid_markers(DetectionResult* result, MarkerData* filtered_markers, 
         Point2f center = calculate_marker_center(marker->corners);
         float angle = calculate_marker_angle(marker->corners);
         
-        // Store marker data
+        // Store marker data (in pixel coordinates for this function)
         filtered_markers[valid_count].id = marker->id;
-        filtered_markers[valid_count].x = center.x;
-        filtered_markers[valid_count].y = center.y;
+        filtered_markers[valid_count].x = center.x;  // Pixel coordinates
+        filtered_markers[valid_count].y = center.y;  // Pixel coordinates
         filtered_markers[valid_count].angle = angle;
+        filtered_markers[valid_count].pixel_x = center.x;  // Same as x for this function
+        filtered_markers[valid_count].pixel_y = center.y;  // Same as y for this function
         valid_count++;
     }
     
@@ -370,14 +372,18 @@ int localize_markers_in_playground(DetectionResult* detection,
             dist_coeffs
         );
         
+        // Calculate pixel coordinates for visualization (always needed)
+        Point2f pixel_center = calculate_marker_center(marker->corners);
+        float angle = calculate_marker_angle(marker->corners);
+        
         if (!pose.success) {
             // Fallback to pixel coordinates if pose estimation fails
-            Point2f center = calculate_marker_center(marker->corners);
-            float angle = calculate_marker_angle(marker->corners);
             markers[valid_count].id = marker->id;
-            markers[valid_count].x = center.x;
-            markers[valid_count].y = center.y;
+            markers[valid_count].x = pixel_center.x;  // Fallback: use pixels as "mm"
+            markers[valid_count].y = pixel_center.y;
             markers[valid_count].angle = angle;
+            markers[valid_count].pixel_x = pixel_center.x;
+            markers[valid_count].pixel_y = pixel_center.y;
             valid_count++;
             continue;
         }
@@ -387,15 +393,13 @@ int localize_markers_in_playground(DetectionResult* detection,
         float playground_point[3];
         transform_camera_to_playground(camera_point, transform_matrix, playground_point);
         
-        // Calculate angle (rotation around Z-axis)
-        // Extract yaw from rotation vector (simplified - assumes small rotations)
-        float angle = calculate_marker_angle(marker->corners);  // Use 2D angle for now
-        
-        // Store marker data with playground coordinates
+        // Store marker data with playground coordinates (mm) and pixel coordinates
         markers[valid_count].id = marker->id;
-        markers[valid_count].x = playground_point[0];  // X in mm
-        markers[valid_count].y = playground_point[1];  // Y in mm
+        markers[valid_count].x = playground_point[0];  // X in mm (terrain)
+        markers[valid_count].y = playground_point[1];  // Y in mm (terrain)
         markers[valid_count].angle = angle;
+        markers[valid_count].pixel_x = pixel_center.x;  // X in pixels (for visualization)
+        markers[valid_count].pixel_y = pixel_center.y;  // Y in pixels (for visualization)
         valid_count++;
     }
     

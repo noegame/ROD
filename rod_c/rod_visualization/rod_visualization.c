@@ -28,6 +28,7 @@
 /* ********************************************* Function implementations *********************************************** */
 
 void rod_viz_annotate_with_ids(ImageHandle* image, MarkerData* markers, int count, DetectionResult* detection) {
+    (void)detection;  // Not needed anymore - we use pixel_x/pixel_y from MarkerData
     Color black = {0, 0, 0};
     Color green = {0, 255, 0};
     double font_scale = 0.5;
@@ -36,26 +37,9 @@ void rod_viz_annotate_with_ids(ImageHandle* image, MarkerData* markers, int coun
         char text[32];
         snprintf(text, sizeof(text), "ID:%d", markers[i].id);
         
-        // Find corresponding marker in detection to get pixel coordinates
-        int x = (int)markers[i].x;  // Default to terrain coords
-        int y = (int)markers[i].y;
-        
-        if (detection) {
-            for (int j = 0; j < detection->count; j++) {
-                if (detection->markers[j].id == markers[i].id) {
-                    // Calculate center from corners in pixels
-                    float corners[4][2];
-                    for (int k = 0; k < 4; k++) {
-                        corners[k][0] = detection->markers[j].corners[k][0];
-                        corners[k][1] = detection->markers[j].corners[k][1];
-                    }
-                    Point2f center = calculate_marker_center(corners);
-                    x = (int)center.x;
-                    y = (int)center.y;
-                    break;
-                }
-            }
-        }
+        // Use pixel coordinates stored in MarkerData
+        int x = (int)markers[i].pixel_x;
+        int y = (int)markers[i].pixel_y;
         
         // Black outline for better visibility
         put_text(image, text, x, y, font_scale, black, 3);
@@ -65,6 +49,7 @@ void rod_viz_annotate_with_ids(ImageHandle* image, MarkerData* markers, int coun
 }
 
 void rod_viz_annotate_with_centers(ImageHandle* image, MarkerData* markers, int count, DetectionResult* detection) {
+    (void)detection;  // Not needed anymore - we use pixel_x/pixel_y from MarkerData
     Color black = {0, 0, 0};
     Color blue = {255, 0, 0};  // OpenCV uses BGR
     double font_scale = 0.5;
@@ -74,26 +59,9 @@ void rod_viz_annotate_with_centers(ImageHandle* image, MarkerData* markers, int 
         // Display terrain coordinates in mm
         snprintf(text, sizeof(text), "(%dmm,%dmm)", (int)markers[i].x, (int)markers[i].y);
         
-        // Find corresponding marker in detection to get pixel coordinates for text positioning
-        int x = (int)markers[i].x;  // Default fallback
-        int y = (int)markers[i].y - 20;  // Position above the marker
-        
-        if (detection) {
-            for (int j = 0; j < detection->count; j++) {
-                if (detection->markers[j].id == markers[i].id) {
-                    // Calculate center from corners in pixels
-                    float corners[4][2];
-                    for (int k = 0; k < 4; k++) {
-                        corners[k][0] = detection->markers[j].corners[k][0];
-                        corners[k][1] = detection->markers[j].corners[k][1];
-                    }
-                    Point2f center = calculate_marker_center(corners);
-                    x = (int)center.x;
-                    y = (int)center.y - 20;  // Position above the marker
-                    break;
-                }
-            }
-        }
+        // Use pixel coordinates stored in MarkerData for text positioning
+        int x = (int)markers[i].pixel_x;
+        int y = (int)markers[i].pixel_y - 20;  // Position above the marker
         
         // Black outline for better visibility
         put_text(image, text, x, y, font_scale, black, 3);

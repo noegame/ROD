@@ -295,6 +295,8 @@ int main(int argc, char** argv) {
         markers_scaled[i].x = markers_filtered[i].x / scale;
         markers_scaled[i].y = markers_filtered[i].y / scale;
         markers_scaled[i].angle = markers_filtered[i].angle;
+        markers_scaled[i].pixel_x = markers_filtered[i].pixel_x / scale;
+        markers_scaled[i].pixel_y = markers_filtered[i].pixel_y / scale;
     }
     
     double t_reload_end = get_time_ms();
