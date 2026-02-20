@@ -23,6 +23,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <stdbool.h>
 
 // Camera calibration parameters (from get_camera_matrix and get_distortion_matrix in aruco.py)
 static float CAMERA_MATRIX[9] = {
@@ -332,12 +333,16 @@ int main(int argc, char** argv) {
     double t_save_start = get_time_ms();
     printf("[8/8] Saving annotated image to: %s\n", output_path);
     
-    // Convert BGR to RGB for output
+    // Convert BGR to RGB for output (OpenCV always loads images as BGR internally)
+    printf("      Converting BGR to RGB...\n");
     ImageHandle* image_rgb = convert_bgr_to_rgb(image);
+    bool conversion_success = (image_rgb != NULL);
     if (image_rgb == NULL) {
-        fprintf(stderr, "Warning: Failed to convert to RGB, saving in BGR format\n");
+        fprintf(stderr, "ERROR: BGR→RGB conversion failed! Check opencv_wrapper implementation.\n");
+        fprintf(stderr, "       Saving in BGR format - colors will be swapped in viewers\n");
         image_rgb = image;  // Fallback to original
     } else {
+        printf("      BGR→RGB conversion successful\n");
         release_image(image);  // Free BGR version
         image = image_rgb;     // Use RGB version
     }
@@ -345,7 +350,11 @@ int main(int argc, char** argv) {
     double t_save_end;
     if (save_image(output_path, image)) {
         t_save_end = get_time_ms();
-        printf("      Annotated image saved successfully in RGB format (%.1fms)\n", t_save_end - t_save_start);
+        if (conversion_success) {
+            printf("      Annotated image saved successfully in RGB format (%.1fms)\n", t_save_end - t_save_start);
+        } else {
+            printf("      Annotated image saved in BGR format (%.1fms)\n", t_save_end - t_save_start);
+        }
     } else {
         t_save_end = get_time_ms();
         fprintf(stderr, "Error: Failed to save annotated image\n");
