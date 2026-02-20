@@ -23,7 +23,7 @@ The computer vision thread send to the communication thread via socket an array 
 
 ```plantuml
 rectangle "Processus ROD" {
-    rectangle "Thread Computer Vision" {
+    rectangle "Process Computer Vision" {
         rectangle "Take picture" as Take_picture {
         }
         rectangle "Detect ArUco TAGs" as Detect_ArUco_TAGs {
@@ -36,7 +36,7 @@ rectangle "Processus ROD" {
         Detect_ArUco_TAGs       --> Calculate_coordinates
         Calculate_coordinates   --> socket
     }
-    rectangle "Thread Communication" {
+    rectangle "Process Communication" {
         rectangle "Receive coordinates from computer vision thread via socket" as receive_socket {
         }
         rectangle "Print coordinates in console" as print_coordinates {
