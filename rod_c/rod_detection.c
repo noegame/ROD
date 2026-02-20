@@ -340,6 +340,10 @@ int main(int argc, char* argv[]) {
         frame_count++;
         double t_loop_start = get_time_ms();
         
+        // Generate timestamp for this frame (used for both logging and file naming)
+        char frame_timestamp[32];
+        rod_config_generate_filename_timestamp(frame_timestamp, sizeof(frame_timestamp));
+        
         // Try to accept a client connection if not already connected
         rod_socket_server_accept(ctx.socket_server);
         
@@ -441,6 +445,9 @@ int main(int argc, char* argv[]) {
             MarkerData markers[100];  // Max 100 markers
             int valid_count = filter_valid_markers(detection, markers, 100);
             
+            // Count markers by category for reporting
+            MarkerCounts marker_counts = count_markers_by_category(markers, valid_count);
+            
             // Send detection results
             if (valid_count > 0) {
                 rod_socket_server_send_detections(ctx.socket_server, markers, valid_count);
@@ -448,12 +455,10 @@ int main(int argc, char* argv[]) {
             double t_send_end = get_time_ms();
             
             // Save images periodically (raw camera + debug annotated)
+            double t_annotate_start = get_time_ms();
+            double t_annotate_end = t_annotate_start;  // Will be updated if annotation happens
             double t_save_start = get_time_ms();
             if (frame_count % SAVE_DEBUG_IMAGE_INTERVAL == 0) {
-                // Generate timestamp for filenames
-                char timestamp[32];
-                rod_config_generate_filename_timestamp(timestamp, sizeof(timestamp));
-                
                 // Ensure date folders exist
                 char pictures_date_folder[256];
                 char debug_date_folder[256];
@@ -462,7 +467,7 @@ int main(int argc, char* argv[]) {
                     
                     // 1. Save raw camera image: /var/roboteseo/pictures/YYYY_MM_DD/YYYYMMDD_HHMMSS_MS.jpg
                     char filename_camera[512];
-                    snprintf(filename_camera, sizeof(filename_camera), "%s/%s.jpg", pictures_date_folder, timestamp);
+                    snprintf(filename_camera, sizeof(filename_camera), "%s/%s.jpg", pictures_date_folder, frame_timestamp);
                     save_image(filename_camera, original_image);
                     
                     // 2. Save annotated debug image: /var/roboteseo/pictures/debug/YYYY_MM_DD/YYYYMMDD_HHMMSS_MS_debug.png
@@ -480,11 +485,12 @@ int main(int argc, char* argv[]) {
                             free(data_copy);
                             
                             if (annotated) {
-                                MarkerCounts marker_counts = count_markers_by_category(markers, valid_count);
+                                t_annotate_start = get_time_ms();
                                 rod_viz_annotate_with_colored_quadrilaterals(annotated, detection);
                                 rod_viz_annotate_with_counter(annotated, marker_counts);
                                 rod_viz_annotate_with_ids(annotated, markers, valid_count);
                                 rod_viz_annotate_with_centers(annotated, markers, valid_count);
+                                t_annotate_end = get_time_ms();
                                 
                                 // Convert BGR to RGB for output
                                 ImageHandle* annotated_rgb = convert_bgr_to_rgb(annotated);
@@ -494,54 +500,73 @@ int main(int argc, char* argv[]) {
                                 }
                                 
                                 char filename_debug[512];
-                                snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.jpg", debug_date_folder, timestamp);
+                                snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.jpg", debug_date_folder, frame_timestamp);
                                 save_image(filename_debug, annotated);
                                 release_image(annotated);
                             }
                         }
                     }
                     
-                    printf("Images saved: %s.jpg and %s_debug.jpg (markers: %d)\n", timestamp, timestamp, valid_count);
+                    // Frame saved message will be printed below
                 }
             }
             double t_save_end = get_time_ms();
             
-            // Print timing breakdown
+            // Print detection summary and timing breakdown
             double t_loop_end = get_time_ms();
-            printf("[Frame %d] Timings: capture=%.1fms create=%.1fms sharpen=%.1fms mask=%.1fms resize=%.1fms detect=%.1fms process+send=%.1fms save=%.1fms | TOTAL=%.1fms (markers: %d)\n",
-                   frame_count,
-                   t_capture_end - t_capture_start,
-                   t_create_end - t_create_start,
-                   t_sharpen_end - t_sharpen_start,
-                   t_mask_end - t_mask_start,
-                   t_resize_end - t_resize_start,
-                   t_detect_end - t_detect_start,
-                   t_send_end - t_process_start,
-                   t_save_end - t_save_start,
-                   t_loop_end - t_loop_start,
-                   valid_count);
+            
+            printf("\n=== Frame %s ===\n", frame_timestamp);
+            printf("\n=== Detection Summary ===\n");
+            printf("Black markers: %d\n", marker_counts.black_markers);
+            printf("Blue markers: %d\n", marker_counts.blue_markers);
+            printf("Yellow markers: %d\n", marker_counts.yellow_markers);
+            printf("Robots markers: %d\n", marker_counts.robot_markers);
+            printf("Fixed markers: %d\n", marker_counts.fixed_markers);
+            printf("TOTAL: %d\n", valid_count);
+            
+            printf("\n=== Timing Summary ===\n");
+            printf("Capture: %.1fms\n", t_capture_end - t_capture_start);
+            printf("Load: %.1fms\n", t_create_end - t_create_start);
+            printf("Sharpen: %.1fms\n", t_sharpen_end - t_sharpen_start);
+            printf("Mask: %.1fms\n", t_mask_end - t_mask_start);
+            printf("Resize: %.1fms\n", t_resize_end - t_resize_start);
+            printf("Detect: %.1fms\n", t_detect_end - t_detect_start);
+            printf("Process: %.1fms\n", t_send_end - t_process_start);
+            printf("Reload: 0.0ms\n");  // Buffers are reused, no reload
+            printf("Annotate: %.1fms\n", t_annotate_end - t_annotate_start);
+            printf("Save: %.1fms\n", t_save_end - t_save_start);
+            printf("TOTAL: %.1fms\n", t_loop_end - t_loop_start);
             
             releaseDetectionResult(detection);
         } else {
             // No markers detected
             double t_loop_end = get_time_ms();
             if (frame_count % 10 == 0) {
-                printf("[Frame %d] No markers | Timings: capture=%.1fms create=%.1fms sharpen=%.1fms mask=%.1fms resize=%.1fms detect=%.1fms | TOTAL=%.1fms\n",
-                       frame_count,
-                       t_capture_end - t_capture_start,
-                       t_create_end - t_create_start,
-                       t_sharpen_end - t_sharpen_start,
-                       t_mask_end - t_mask_start,
-                       t_resize_end - t_resize_start,
-                       t_detect_end - t_detect_start,
-                       t_loop_end - t_loop_start);
+                printf("\n=== Frame %s ===\n", frame_timestamp);
+                printf("\n=== Detection Summary ===\n");
+                printf("Black markers: 0\n");
+                printf("Blue markers: 0\n");
+                printf("Yellow markers: 0\n");
+                printf("Robots markers: 0\n");
+                printf("Fixed markers: 0\n");
+                printf("TOTAL: 0\n");
+                
+                printf("\n=== Timing Summary ===\n");
+                printf("Capture: %.1fms\n", t_capture_end - t_capture_start);
+                printf("Load: %.1fms\n", t_create_end - t_create_start);
+                printf("Sharpen: %.1fms\n", t_sharpen_end - t_sharpen_start);
+                printf("Mask: %.1fms\n", t_mask_end - t_mask_start);
+                printf("Resize: %.1fms\n", t_resize_end - t_resize_start);
+                printf("Detect: %.1fms\n", t_detect_end - t_detect_start);
+                printf("Process: 0.0ms\n");  // No processing when no markers
+                printf("Reload: 0.0ms\n");
+                printf("Annotate: 0.0ms\n");
+                printf("Save: 0.0ms\n");  // No save on this frame (if not SAVE_DEBUG_IMAGE_INTERVAL)
+                printf("TOTAL: %.1fms\n", t_loop_end - t_loop_start);
             }
             
             // Save images periodically even when no markers detected
             if (frame_count % SAVE_DEBUG_IMAGE_INTERVAL == 0) {
-                char timestamp[32];
-                rod_config_generate_filename_timestamp(timestamp, sizeof(timestamp));
-                
                 // Ensure date folders exist
                 char pictures_date_folder[256];
                 char debug_date_folder[256];
@@ -550,19 +575,19 @@ int main(int argc, char* argv[]) {
                     
                     // Save raw camera image
                     char filename_camera[512];
-                    snprintf(filename_camera, sizeof(filename_camera), "%s/%s.jpg", pictures_date_folder, timestamp);
+                    snprintf(filename_camera, sizeof(filename_camera), "%s/%s.jpg", pictures_date_folder, frame_timestamp);
                     save_image(filename_camera, original_image);
                     
                     // Save debug image (no annotations, but in debug folder) in RGB format
                     ImageHandle* debug_rgb = convert_bgr_to_rgb(original_image);
                     if (debug_rgb) {
                         char filename_debug[512];
-                        snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.jpg", debug_date_folder, timestamp);
+                        snprintf(filename_debug, sizeof(filename_debug), "%s/%s_debug.jpg", debug_date_folder, frame_timestamp);
                         save_image(filename_debug, debug_rgb);
                         release_image(debug_rgb);
                     }
                     
-                    printf("Images saved: %s.jpg and %s_debug.jpg (no markers)\n", timestamp, timestamp);
+                    // Image saved (no markers case)
                 }
             }
         }
