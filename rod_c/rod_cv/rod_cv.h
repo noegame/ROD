@@ -177,29 +177,24 @@ void transform_camera_to_playground(const float* camera_point,
                                     float* playground_point);
 
 /**
- * @brief Convert detection results from pixel coordinates to playground coordinates
+ * @brief Convert detection results from pixel coordinates to playground coordinates using homography
  * @param detection Detection result with pixel coordinates
- * @param markers Output array of markers with playground coordinates (x,y in mm, z from tvec)
+ * @param markers Output array of markers with playground coordinates (x,y in mm)
  * @param max_markers Maximum number of markers to process
- * @param camera_matrix Camera intrinsic matrix
- * @param dist_coeffs Distortion coefficients
+ * @param homography_inv Inverse homography matrix (3x3) for pixel -> terrain transformation
  * @return Number of markers successfully localized, -1 on error
  * 
  * This function:
- * 1. Computes camera-to-playground transformation using fixed markers (100mm)
- * 2. For each valid marker, estimates pose in camera frame using correct size per ID
- * 3. Transforms to playground coordinates
+ * 1. For each valid marker, calculates pixel center from corners
+ * 2. Applies homography transformation: (x_pixel, y_pixel) -> (x_mm, y_mm)
+ * 3. Stores both pixel and terrain coordinates in MarkerData
  * 
- * Note: Marker sizes are automatically determined from IDs:
- * - Fixed markers (20-23): 100mm
- * - Robot markers (1-10): 70mm  
- * - Game elements (36,41,47): 40mm
+ * Note: Uses 2D homography instead of 3D pose estimation for planar terrain
  */
 int localize_markers_in_playground(DetectionResult* detection,
                                    MarkerData* markers,
                                    int max_markers,
-                                   const float* camera_matrix,
-                                   const float* dist_coeffs);
+                                   const float* homography_inv);
 
 /**
  * @brief Create a mask for the playing field based on fixed markers

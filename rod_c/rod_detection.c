@@ -65,6 +65,8 @@ typedef struct {
     DetectorParametersHandle* params;
     RodSocketServer* socket_server;
     ImageHandle* field_mask;  // Field mask for filtering detections
+    float homography_inv[9];  // Inverse homography matrix (image -> playground)
+    bool has_homography;      // Flag indicating if homography is valid
     
     // Reusable buffers to reduce memory allocations
     ImageHandle* buffer_sharpened;  // Buffer for sharpened image
@@ -125,6 +127,7 @@ static int init_app_context(AppContext* ctx, CameraType camera_type, const char*
     memset(ctx, 0, sizeof(AppContext));
     ctx->socket_server = NULL;
     ctx->field_mask = NULL;
+    ctx->has_homography = false;
     ctx->buffer_sharpened = NULL;
     ctx->buffer_masked = NULL;
     ctx->buffer_resized = NULL;
@@ -389,10 +392,11 @@ int main(int argc, char* argv[]) {
         // Step 2: Create field mask if not already created (from current frame)
         double t_mask_start = get_time_ms();
         if (!ctx.field_mask) {
-            // Try to create mask from current sharpened image
-            ctx.field_mask = create_field_mask_from_image(ctx.buffer_sharpened, ctx.detector, width, height, 1.1f, NULL);
+            // Try to create mask and compute homography from current sharpened image
+            ctx.field_mask = create_field_mask_from_image(ctx.buffer_sharpened, ctx.detector, width, height, 1.1f, ctx.homography_inv);
             if (ctx.field_mask) {
-                printf("[Frame %d] Field mask created successfully from captured frame\n", frame_count);
+                ctx.has_homography = true;
+                printf("[Frame %d] Field mask and homography created successfully from captured frame\n", frame_count);
             }
         }
         
@@ -436,12 +440,18 @@ int main(int argc, char* argv[]) {
         }
         
         if (detection && detection->count > 0) {
-            // Localize markers in playground coordinates using SolvePnP + transformation
+            // Localize markers in playground coordinates using homography transformation
             double t_pose_start = get_time_ms();
             MarkerData markers[100];  // Max 100 markers
-            const float* K = rod_config_get_camera_matrix();
-            const float* D = rod_config_get_distortion_coeffs();
-            int valid_count = localize_markers_in_playground(detection, markers, 100, K, D);
+            int valid_count = 0;
+            
+            if (ctx.has_homography) {
+                // Use homography for pixel -> terrain transformation
+                valid_count = localize_markers_in_playground(detection, markers, 100, ctx.homography_inv);
+            } else {
+                // Fallback to pixel coordinates if no homography available
+                valid_count = filter_valid_markers(detection, markers, 100);
+            }
             double t_pose_end = get_time_ms();
             
             // Count markers by category for reporting
@@ -485,10 +495,21 @@ int main(int argc, char* argv[]) {
                             
                             if (annotated) {
                                 t_annotate_start = get_time_ms();
-                                rod_viz_annotate_with_colored_quadrilaterals(annotated, detection);
+                                // Only draw quadrilaterals for valid markers
+                                for (int i = 0; i < valid_count; i++) {
+                                    // Find corresponding marker in detection for corners
+                                    for (int j = 0; j < detection->count; j++) {
+                                        if (detection->markers[j].id == markers[i].id) {
+                                            DetectionResult single_marker;
+                                            single_marker.count = 1;
+                                            single_marker.markers = &detection->markers[j];
+                                            rod_viz_annotate_with_colored_quadrilaterals(annotated, &single_marker);
+                                            break;
+                                        }
+                                    }
+                                }
                                 rod_viz_annotate_with_counter(annotated, marker_counts);
-                                rod_viz_annotate_with_ids(annotated, markers, valid_count, detection);
-                                rod_viz_annotate_with_centers(annotated, markers, valid_count, detection);
+                                rod_viz_annotate_with_full_info(annotated, markers, valid_count);
                                 t_annotate_end = get_time_ms();
                                 
                                 // Convert BGR to RGB for output

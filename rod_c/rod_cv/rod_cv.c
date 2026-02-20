@@ -331,22 +331,11 @@ void transform_camera_to_playground(const float* camera_point,
 int localize_markers_in_playground(DetectionResult* detection,
                                    MarkerData* markers,
                                    int max_markers,
-                                   const float* camera_matrix,
-                                   const float* dist_coeffs) {
-    if (!detection || !markers || max_markers <= 0) {
+                                   const float* homography_inv) {
+    if (!detection || !markers || max_markers <= 0 || !homography_inv) {
         return -1;
     }
     
-    // Step 1: Compute camera-to-playground transformation
-    // Fixed markers are always 100mm
-    float transform_matrix[16];
-    if (compute_camera_to_playground_transform(detection, camera_matrix, dist_coeffs, 
-                                               100.0f, transform_matrix) != 0) {
-        // Fallback to pixel coordinates if transformation fails
-        return filter_valid_markers(detection, markers, max_markers);
-    }
-    
-    // Step 2: For each valid marker, estimate pose and transform to playground frame
     int valid_count = 0;
     
     for (int i = 0; i < detection->count && valid_count < max_markers; i++) {
@@ -357,29 +346,18 @@ int localize_markers_in_playground(DetectionResult* detection,
             continue;
         }
         
-        // Get marker size based on ID (100mm for fixed, 70mm for robots, 40mm for game elements)
-        float marker_size = rod_config_get_marker_size(marker->id);
-        if (marker_size == 0.0f) {
-            // Invalid marker, skip
-            continue;
-        }
-        
-        // Estimate pose in camera frame
-        PnPResult pose = estimate_marker_pose_camera_frame(
-            marker->corners,
-            marker_size,
-            camera_matrix,
-            dist_coeffs
-        );
-        
-        // Calculate pixel coordinates for visualization (always needed)
+        // Calculate pixel center from corners
         Point2f pixel_center = calculate_marker_center(marker->corners);
         float angle = calculate_marker_angle(marker->corners);
         
-        if (!pose.success) {
-            // Fallback to pixel coordinates if pose estimation fails
+        // Transform pixel coordinates to playground coordinates using homography
+        Point2f pixel_point = {pixel_center.x, pixel_center.y};
+        Point2f* terrain_point = perspective_transform(&pixel_point, 1, (float*)homography_inv);
+        
+        if (!terrain_point) {
+            // Fallback: use pixel coordinates if transformation fails
             markers[valid_count].id = marker->id;
-            markers[valid_count].x = pixel_center.x;  // Fallback: use pixels as "mm"
+            markers[valid_count].x = pixel_center.x;
             markers[valid_count].y = pixel_center.y;
             markers[valid_count].angle = angle;
             markers[valid_count].pixel_x = pixel_center.x;
@@ -388,18 +366,17 @@ int localize_markers_in_playground(DetectionResult* detection,
             continue;
         }
         
-        // Transform from camera frame to playground frame
-        float camera_point[3] = {pose.tvec[0], pose.tvec[1], pose.tvec[2]};
-        float playground_point[3];
-        transform_camera_to_playground(camera_point, transform_matrix, playground_point);
-        
         // Store marker data with playground coordinates (mm) and pixel coordinates
         markers[valid_count].id = marker->id;
-        markers[valid_count].x = playground_point[0];  // X in mm (terrain)
-        markers[valid_count].y = playground_point[1];  // Y in mm (terrain)
+        markers[valid_count].x = terrain_point[0].x;  // X in mm (terrain)
+        markers[valid_count].y = terrain_point[0].y;  // Y in mm (terrain)
         markers[valid_count].angle = angle;
         markers[valid_count].pixel_x = pixel_center.x;  // X in pixels (for visualization)
         markers[valid_count].pixel_y = pixel_center.y;  // Y in pixels (for visualization)
+        
+        // Free allocated memory
+        free_points_2f(terrain_point);
+        
         valid_count++;
     }
     

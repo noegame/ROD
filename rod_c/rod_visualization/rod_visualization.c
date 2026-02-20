@@ -77,14 +77,16 @@ void rod_viz_annotate_with_full_info(ImageHandle* image, MarkerData* markers, in
     
     for (int i = 0; i < count; i++) {
         char text[128];
+        // Display: ID, x_terrain_mm, y_terrain_mm, angle_rad
         snprintf(text, sizeof(text), "%d, %d, %d, %.2f", 
                  markers[i].id, 
-                 (int)markers[i].x, 
-                 (int)markers[i].y, 
+                 (int)markers[i].x,      // Terrain X in mm
+                 (int)markers[i].y,      // Terrain Y in mm
                  markers[i].angle);
         
-        int x = (int)markers[i].x;
-        int y = (int)markers[i].y;
+        // Position text at pixel coordinates
+        int x = (int)markers[i].pixel_x;
+        int y = (int)markers[i].pixel_y;
         
         // Black outline for better visibility
         put_text(image, text, x, y, font_scale, black, 3);
