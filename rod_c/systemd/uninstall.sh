@@ -21,21 +21,21 @@ fi
 # Stop services if running
 echo "Stopping services..."
 systemctl stop rod.target 2>/dev/null || true
-systemctl stop rod-detection.service 2>/dev/null || true
-systemctl stop rod-communication.service 2>/dev/null || true
+systemctl stop rod_detection.service 2>/dev/null || true
+systemctl stop rod_communication.service 2>/dev/null || true
 echo -e "${GREEN}✓${NC} Services stopped"
 
 # Disable services
 echo "Disabling services..."
 systemctl disable rod.target 2>/dev/null || true
-systemctl disable rod-detection.service 2>/dev/null || true
-systemctl disable rod-communication.service 2>/dev/null || true
+systemctl disable rod_detection.service 2>/dev/null || true
+systemctl disable rod_communication.service 2>/dev/null || true
 echo -e "${GREEN}✓${NC} Services disabled"
 
 # Remove service files
 echo "Removing service files..."
-rm -f /etc/systemd/system/rod-detection.service
-rm -f /etc/systemd/system/rod-communication.service
+rm -f /etc/systemd/system/rod_detection.service
+rm -f /etc/systemd/system/rod_communication.service
 rm -f /etc/systemd/system/rod.target
 echo -e "${GREEN}✓${NC} Service files removed"
 

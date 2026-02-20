@@ -49,8 +49,8 @@ echo -e "${GREEN}✓${NC} Directories created in /var/roboteseo/"
 
 # Copy service files
 echo "Installing service files..."
-cp "$SCRIPT_DIR/rod-detection.service" /etc/systemd/system/
-cp "$SCRIPT_DIR/rod-communication.service" /etc/systemd/system/
+cp "$SCRIPT_DIR/rod_detection.service" /etc/systemd/system/
+cp "$SCRIPT_DIR/rod_communication.service" /etc/systemd/system/
 cp "$SCRIPT_DIR/rod.target" /etc/systemd/system/
 
 echo -e "${GREEN}✓${NC} Service files copied to /etc/systemd/system/"
@@ -66,6 +66,6 @@ echo ""
 echo "Next steps:"
 echo "  1. Start services:     ${YELLOW}sudo systemctl start rod.target${NC}"
 echo "  2. Check status:       ${YELLOW}systemctl status rod.target${NC}"
-echo "  3. View logs:          ${YELLOW}sudo journalctl -u rod-detection.service -f${NC}"
+echo "  3. View logs:          ${YELLOW}sudo journalctl -u rod_detection.service -f${NC}"
 echo "  4. Enable at boot:     ${YELLOW}sudo systemctl enable rod.target${NC}"
 echo ""

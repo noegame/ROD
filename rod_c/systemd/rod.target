@@ -3,7 +3,7 @@ Description=ROD - Remote Observation Device (Complete System)
 After=network.target
 
 # This target groups both services together
-Wants=rod-detection.service rod-communication.service
+Wants=rod_detection.service rod_communication.service
 
 [Install]
 WantedBy=multi-user.target
