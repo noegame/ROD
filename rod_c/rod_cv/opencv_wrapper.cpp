@@ -154,8 +154,17 @@ int save_image(const char* path, ImageHandle* handle) {
         }
     }
     
-    // Try to save the image with compression parameters
-    bool success = cv::imwrite(path, *image, compression_params);
+    // Convert BGR to RGB for better readability in image viewers
+    cv::Mat rgb_image;
+    if (image->channels() == 3) {
+        cv::cvtColor(*image, rgb_image, cv::COLOR_BGR2RGB);
+    } else {
+        // Grayscale or RGBA - no conversion needed
+        rgb_image = *image;
+    }
+    
+    // Try to save the RGB image with compression parameters
+    bool success = cv::imwrite(path, rgb_image, compression_params);
     if (!success) {
         fprintf(stderr, "save_image: cv::imwrite failed for path %s\n", path);
     }
@@ -561,6 +570,39 @@ void put_text(ImageHandle* image, const char* text, int x, int y,
     
     cv::putText(*img, text, cv::Point(x, y), 
                 cv::FONT_HERSHEY_SIMPLEX, font_scale, cv_color, thickness);
+}
+
+void put_text_rotated(ImageHandle* image, const char* text, int x, int y,
+                      double font_scale, Color color, int thickness, double angle_radians) {
+    if (image == nullptr || text == nullptr) return;
+    
+    cv::Mat* img = reinterpret_cast<cv::Mat*>(image);
+    cv::Scalar cv_color(color.b, color.g, color.r);
+    
+    // Convert radians to degrees for OpenCV
+    double angle_degrees = angle_radians * 180.0 / CV_PI;
+    
+    // Create rotation matrix around the text anchor point
+    cv::Point2f text_center(x, y);
+    cv::Mat rotation_matrix = cv::getRotationMatrix2D(text_center, -angle_degrees, 1.0);
+    
+    // Create a copy of the image to apply rotation
+    cv::Mat rotated_img = img->clone();
+    cv::warpAffine(*img, rotated_img, rotation_matrix, img->size(), 
+                   cv::INTER_LINEAR, cv::BORDER_TRANSPARENT);
+    
+    // Draw text on rotated image
+    cv::putText(rotated_img, text, cv::Point(x, y),
+                cv::FONT_HERSHEY_SIMPLEX, font_scale, cv_color, thickness);
+    
+    // Rotate back and blend
+    rotation_matrix = cv::getRotationMatrix2D(text_center, angle_degrees, 1.0);
+    cv::Mat final_img;
+    cv::warpAffine(rotated_img, final_img, rotation_matrix, img->size(),
+                   cv::INTER_LINEAR, cv::BORDER_TRANSPARENT);
+    
+    // Copy non-transparent pixels back to original
+    final_img.copyTo(*img, final_img != 0);
 }
 
 void draw_polyline(ImageHandle* image, float corners[4][2], Color color, int thickness) {

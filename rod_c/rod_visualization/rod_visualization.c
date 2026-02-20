@@ -65,6 +65,30 @@ void rod_viz_annotate_with_centers(ImageHandle* image, MarkerData* markers, int 
     }
 }
 
+void rod_viz_annotate_with_full_info(ImageHandle* image, MarkerData* markers, int count) {
+    Color black = {0, 0, 0};
+    Color green = {0, 255, 0};
+    double font_scale = 0.6;
+    
+    for (int i = 0; i < count; i++) {
+        char text[128];
+        snprintf(text, sizeof(text), "%d, %d, %d, %.2f", 
+                 markers[i].id, 
+                 (int)markers[i].x, 
+                 (int)markers[i].y, 
+                 markers[i].angle);
+        
+        int x = (int)markers[i].x;
+        int y = (int)markers[i].y;
+        double angle = markers[i].angle;  // Angle in radians
+        
+        // Black outline for better visibility (rotated)
+        put_text_rotated(image, text, x, y, font_scale, black, 3, angle);
+        // Green text (rotated)
+        put_text_rotated(image, text, x, y, font_scale, green, 2, angle);
+    }
+}
+
 void rod_viz_annotate_with_colored_quadrilaterals(ImageHandle* image, DetectionResult* detection) {
     if (!image || !detection) {
         return;
@@ -192,11 +216,10 @@ int rod_viz_save_debug_image(ImageHandle* image, MarkerData* markers, int count,
     // Count markers by category
     MarkerCounts marker_counts = count_markers_by_category(markers, count);
     
-    // Annotate the copied image
+    // Annotate the copied image with counter and full marker info (ID, x, y, angle)
     rod_viz_annotate_with_counter(annotated, marker_counts);
     if (count > 0) {
-        rod_viz_annotate_with_ids(annotated, markers, count);
-        rod_viz_annotate_with_centers(annotated, markers, count);
+        rod_viz_annotate_with_full_info(annotated, markers, count);
     }
     
     // Generate timestamp for filename

@@ -256,9 +256,8 @@ int main(int argc, char** argv) {
     if (valid_count > 0) {
         rod_viz_annotate_with_colored_quadrilaterals(image, result_raw);
         rod_viz_annotate_with_counter(image, counts);
-        rod_viz_annotate_with_ids(image, markers_scaled, valid_count);
-        rod_viz_annotate_with_centers(image, markers_scaled, valid_count);
-        printf("      Annotations added: colored quadrilaterals, categorized counts, IDs, centers\n");
+        rod_viz_annotate_with_full_info(image, markers_scaled, valid_count);
+        printf("      Annotations added: colored quadrilaterals, categorized counts, full marker info (ID, x, y, angle)\n");
     } else {
         rod_viz_annotate_with_counter(image, counts);  // Still show counts (all zeros)
         printf("      No markers to annotate\n");

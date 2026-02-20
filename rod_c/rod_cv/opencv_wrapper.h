@@ -160,6 +160,10 @@ typedef struct {
 void put_text(ImageHandle* image, const char* text, int x, int y, 
               double font_scale, Color color, int thickness);
 
+// Add rotated text to image (angle in radians)
+void put_text_rotated(ImageHandle* image, const char* text, int x, int y,
+                      double font_scale, Color color, int thickness, double angle_radians);
+
 // Draw polyline (quadrilateral outline) on image
 // Points should be an array of 4 corner points [x,y]
 void draw_polyline(ImageHandle* image, float corners[4][2], Color color, int thickness);

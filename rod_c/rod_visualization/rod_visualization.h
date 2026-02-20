@@ -46,6 +46,17 @@ void rod_viz_annotate_with_ids(ImageHandle* image, MarkerData* markers, int coun
 void rod_viz_annotate_with_centers(ImageHandle* image, MarkerData* markers, int count);
 
 /**
+ * @brief Annotate image with complete marker info (ID, coordinates, angle)
+ * @param image Image handle (will be modified in place)
+ * @param markers Array of marker data
+ * @param count Number of markers
+ * 
+ * Draws green text with black outline showing "ID, x, y, angle" at each marker
+ * Example: "41, 1200, 1400, 1.07"
+ */
+void rod_viz_annotate_with_full_info(ImageHandle* image, MarkerData* markers, int count);
+
+/**
  * @brief Annotate image with colored quadrilaterals based on marker ID
  * @param image Image handle (will be modified in place)
  * @param detection Detection result containing marker corners
