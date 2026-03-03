@@ -2,11 +2,10 @@
 """
 Simple script to capture images for camera calibration.
 
-This script uses the configuration to get the resolution,
-initializes the camera in still mode (high quality),
+This script initializes the camera in still mode (high quality),
 and captures an image each time the user presses [Enter].
 
-Images are saved in 'output/calibration' with the date and resolution in the filename.
+Images are saved in '/var/roboteseo/pictures/calibration' with the date and resolution in the filename.
 
 Press Ctrl+C to stop the script.
 """
@@ -18,9 +17,16 @@ Press Ctrl+C to stop the script.
 import logging
 import sys
 from datetime import datetime
+from pathlib import Path
 
-from rod_python.src.camera.camera_factory import get_camera
-from rod_python.src.config import config
+try:
+    from picamera2 import Picamera2
+    import cv2
+    import numpy as np
+except ImportError as e:
+    print(f"Error: Required library not found: {e}")
+    print("Please install: pip install picamera2 opencv-python numpy")
+    sys.exit(1)
 
 # ANSI color codes
 COLOR_GREEN = '\033[0;32m'
@@ -42,13 +48,11 @@ def main():
     setup_logging()
     logger = logging.getLogger("capture_for_calibration")
 
+    cam = None
     try:
-        image_width, image_height = config.get_camera_resolution()
-        output_path = (
-            config.get_pictures_directory()
-            / "calibration"
-            / f"{datetime.now().strftime('%Y%m%d')}"
-        )
+        # Configuration
+        image_width, image_height = 4056, 3040  # Full resolution for calibration
+        output_path = Path("/var/roboteseo/pictures/calibration") / datetime.now().strftime('%Y-%m-%d')
 
         # Create the output directory if it doesn't exist
         output_path.mkdir(parents=True, exist_ok=True)
@@ -58,12 +62,12 @@ def main():
         logger.info(
             f"Initializing the camera with a resolution of {image_width}x{image_height}..."
         )
-        cam = get_camera(
-            w=image_width,
-            h=image_height,
-            camera="picamera",
-            camera_param="still",
+        cam = Picamera2()
+        config_cam = cam.create_still_configuration(
+            main={"size": (image_width, image_height), "format": "RGB888"},
         )
+        cam.configure(config_cam)
+        cam.start()
         logger.info(f"{COLOR_GREEN}Camera initialized in STILL mode (high quality){COLOR_RESET}")
 
         logger.info("=" * 60)
@@ -85,11 +89,9 @@ def main():
                 filepath = output_path / filename
 
                 # Capture the image
-                import cv2
+                image_array = cam.capture_array()
 
-                image_array = cam.take_picture()
-
-                # Save the image manually
+                # Save the image manually (convert RGB to BGR for OpenCV)
                 cv2.imwrite(
                     str(filepath),
                     cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR),

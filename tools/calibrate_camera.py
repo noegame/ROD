@@ -20,11 +20,18 @@ import sys
 import cv2
 import numpy as np
 from pathlib import Path
-from rod_python.src.config import config
+from datetime import datetime
 
-img_input_dir = config.get_pictures_directory() / "calibration" / "2026-01-14"
-img_output_dir = config.get_debug_directory() / "calibration"
-output_dir = config.get_vision_directory() / "config" / "calibrations" / "80_lens"
+# Base calibration directory
+base_calibration_dir = Path("/var/roboteseo/pictures/calibration")
+
+# Find the most recent calibration folder (or use today's date)
+today_str = datetime.now().strftime('%Y-%m-%d')
+img_input_dir = base_calibration_dir / today_str
+
+# Output directories
+img_output_dir = base_calibration_dir / "debug"
+output_dir = base_calibration_dir / "results"
 
 
 def collect_image_paths(images_dir):
