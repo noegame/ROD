@@ -1,3 +1,6 @@
+Please note that this project has been migrated to the Robot Eseo club repository.
+This repository is therefore no longer up to date.
+
 # ROD
 
 ## Summary
